@@ -2205,7 +2205,7 @@
     <string name="liburu_next_sub">Unstarted books that suit you best</string>
     <string name="liburu_goals">Reading goals</string>
     <string name="liburu_goals_sub">Read every day, grow your stats and finish more books.</string>
-    <string name="liburu_today">Today's reading</string>
+    <string name="liburu_today">Today\'s reading</string>
     <string name="liburu_of_goal">of your %1$d min goal</string>
     <string name="liburu_keep_reading">Keep reading</string>
     <string name="liburu_read_this_year">Books read this year · %1$d / %2$d</string>

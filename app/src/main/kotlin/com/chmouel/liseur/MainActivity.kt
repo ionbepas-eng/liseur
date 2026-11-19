@@ -247,8 +247,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Leaving the app: publish the latest place before the process may go.
+        container.applicationScopeLaunch { container.driveStateSync.syncNow(force = true) }
+    }
+
     override fun onStart() {
         super.onStart()
+        lifecycleScope.launch { container.driveStateSync.syncNow() }
         lifecycleScope.launch {
             val leftFromReader = container.sessionState.enterLibrary()
             if (deciding && resumeJob == null) {

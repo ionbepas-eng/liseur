@@ -1022,6 +1022,27 @@ class AppContainer(
             onError = { message, error -> Log.e("position-sync", message, error) },
         )
 
+    fun applicationScopeLaunch(block: suspend () -> Unit) {
+        applicationScope.launch { block() }
+    }
+
+    /** Liburuville: positions, highlights and notes of Drive books, shared through Drive. */
+    val driveStateSync by lazy {
+        com.chmouel.liseur.data.gdrive.DriveStateSync(
+            context = context.applicationContext,
+            isDrive = { database.remoteServerDao().get()?.kind == ServerKind.DRIVE },
+            progressDao = database.readingProgressDao(),
+            positions = ReadingPositionBackupRepository(
+                database.readingProgressDao(),
+                database.bookDao(),
+                ::requestBookSync,
+                finishedState = finishedState,
+                inTransaction = { work -> database.withTransaction { work() } },
+            ),
+            annotations = annotationBackup,
+        )
+    }
+
     fun requestBookSync(bookId: String) = latestPositionSync.signal(bookId)
 
     /** A full sync, for work that is not one book's: an account-wide clear, a book that has left the shelf. */

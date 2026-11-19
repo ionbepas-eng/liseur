@@ -5,6 +5,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
@@ -17,6 +18,23 @@ fun literataFamily(assets: AssetManager): FontFamily = FontFamily(
     Font("fonts/Literata.ttf", assets),
     Font("fonts/Literata-Italic.ttf", assets, style = FontStyle.Italic),
 )
+
+/**
+ * Fraunces, soft and upright, as Liburuville sets its titles. One variable
+ * file carries every weight; the instances below pin the axes.
+ */
+fun frauncesFamily(assets: AssetManager): FontFamily {
+    fun cut(w: Int) = Font(
+        "fonts/Fraunces.ttf", assets, FontWeight(w),
+        variationSettings = FontVariation.Settings(
+            FontVariation.weight(w),
+            FontVariation.Setting("SOFT", 100f),
+            FontVariation.Setting("WONK", 0f),
+            FontVariation.Setting("opsz", 72f),
+        ),
+    )
+    return FontFamily(cut(400), cut(500), cut(600), cut(700))
+}
 
 fun liseurTypography(serif: FontFamily): Typography = Typography().run {
     copy(

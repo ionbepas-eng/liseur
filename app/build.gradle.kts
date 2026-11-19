@@ -58,7 +58,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.chmouel.liseur"
+        applicationId = "com.ionbepas.liburuville"
         minSdk = 26
         targetSdk = 37
         versionCode = 81

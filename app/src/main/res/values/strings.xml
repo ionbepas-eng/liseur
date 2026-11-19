@@ -1,7 +1,7 @@
 <resources>
     <string name="reader_sync_furthest_known">Furthest read</string>
     <string name="reader_sync_take_furthest">Go to furthest</string>
-    <string name="app_name" translatable="false">Liseur</string>
+    <string name="app_name" translatable="false">Liburuville</string>
 
     <string name="sort_recent">Recent</string>
     <string name="sort_title">Title</string>
@@ -9,7 +9,7 @@
     <string name="sort_added">Recently added</string>
     <string name="sort_normal">Reverse the order</string>
     <string name="sort_reversed">Back to the usual order</string>
-    <string name="library_title" translatable="false">Liseur</string>
+    <string name="library_title" translatable="false">Liburuville</string>
     <plurals name="library_book_count">
         <item quantity="one">%d book</item>
         <item quantity="other">%d books</item>

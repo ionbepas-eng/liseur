@@ -323,7 +323,7 @@ fun LiseurTheme(
         schemeFor(dark = darkTheme, eInk = palette, dynamicColor = dynamicColor)
     }
 
-    val typography = remember { liseurTypography(literataFamily(context.assets)) }
+    val typography = remember { liseurTypography(frauncesFamily(context.assets)) }
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,

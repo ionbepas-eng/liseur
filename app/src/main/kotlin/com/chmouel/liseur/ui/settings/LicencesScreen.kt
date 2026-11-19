@@ -78,6 +78,12 @@ private val Components = listOf(
         notice = "Copyright 2023 Calvin Liang",
     ),
     Component(
+        name = "Fraunces",
+        licence = "SIL Open Font License 1.1",
+        notice = "Copyright 2020 The Fraunces Project Authors",
+        licenceAsset = "licences/fraunces.txt",
+    ),
+    Component(
         name = "Literata",
         licence = "SIL Open Font License 1.1",
         notice = "Copyright 2017 The Literata Project Authors",

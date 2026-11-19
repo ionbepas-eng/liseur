@@ -165,6 +165,8 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 32.dp + (bottomBarSpace - padding.calculateBottomPadding()).coerceAtLeast(0.dp)),
             ) {
+                LiburuSettings()
+
                 SettingsGroup(stringResource(R.string.settings_appearance)) {
                     ChipRow(
                         title = stringResource(R.string.settings_theme),

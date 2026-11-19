@@ -89,5 +89,17 @@ val DarkHomePalette = HomePalette(
 @Composable
 fun homePalette(): HomePalette? {
     if (LocalEInk.current) return null
-    return if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) DarkHomePalette else LightHomePalette
+    val base = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) DarkHomePalette else LightHomePalette
+    // Liburuville: the chosen accent leads the tab bar and the progress bars.
+    val primary = MaterialTheme.colorScheme.primary
+    val accent = com.chmouel.liseur.ui.theme.LiburuAppearance.accentColor(
+        com.chmouel.liseur.ui.theme.LiburuAppearance.look.value,
+    )
+    return base.copy(
+        accent = accent,
+        progress = primary,
+        tabSelected = accent,
+        onTabSelected = if (accent.luminance() > 0.5f) Color(0xFF1B1A17) else Color.White,
+        reading = base.reading.copy(content = primary),
+    )
 }

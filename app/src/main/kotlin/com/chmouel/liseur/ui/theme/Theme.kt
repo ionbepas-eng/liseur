@@ -11,6 +11,8 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -319,6 +321,12 @@ fun LiseurTheme(
             page = readingPage,
             eInk = eInk,
         )
+    } else if (palette == EInkPalette.NONE && !usesWallpaperColours(palette, dynamicColor)) {
+        // Liburuville: the background and accent chosen in Settings.
+        LiburuAppearance.init(context)
+        val look by LiburuAppearance.look.collectAsState()
+        val dark = LiburuAppearance.forcesDark(look) ?: darkTheme
+        schemeFor(dark = dark, eInk = palette, dynamicColor = false).liburu(look, dark)
     } else {
         schemeFor(dark = darkTheme, eInk = palette, dynamicColor = dynamicColor)
     }

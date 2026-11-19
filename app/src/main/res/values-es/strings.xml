@@ -2145,4 +2145,26 @@
         <item quantity="many">Tu récord es de %1$d días.</item>
         <item quantity="other">Tu récord es de %1$d días.</item>
     </plurals>
+    <string name="liburu_appearance">Apariencia de Liburuville</string>
+    <string name="liburu_background">Color de fondo</string>
+    <string name="liburu_bg_auto">Automático</string>
+    <string name="liburu_accent">Color de acento</string>
+    <string name="liburu_goals_settings">Metas</string>
+    <string name="liburu_goal_minutes">Minutos al día</string>
+    <string name="liburu_goal_books">Libros al año</string>
+    <string name="liburu_your_name">Tu nombre (saludo de Inicio)</string>
+    <string name="liburu_c_crema">Crema</string>
+    <string name="liburu_c_papel">Papel</string>
+    <string name="liburu_c_blanco">Blanco</string>
+    <string name="liburu_c_arena">Arena</string>
+    <string name="liburu_c_salvia">Salvia</string>
+    <string name="liburu_c_rosa">Rosa</string>
+    <string name="liburu_c_niebla">Niebla</string>
+    <string name="liburu_c_grafito">Grafito</string>
+    <string name="liburu_c_noche">Noche</string>
+    <string name="liburu_c_terracota">Terracota</string>
+    <string name="liburu_c_azul">Azul</string>
+    <string name="liburu_c_verde">Verde</string>
+    <string name="liburu_c_morado">Morado</string>
+    <string name="liburu_c_tinta">Tinta</string>
 </resources>

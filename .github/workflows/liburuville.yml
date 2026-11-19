@@ -48,6 +48,9 @@ jobs:
           keyPassword=$KEYSTORE_PASSWORD
           EOF
 
+      - name: Stamp the version with the commit
+        run: sed -i -E "s/versionName = \"([^\"]+)\"/versionName = \"\1-lb.${GITHUB_SHA::7}\"/" app/build.gradle.kts && grep versionName app/build.gradle.kts
+
       - name: Build
         run: ./gradlew assembleFossRelease --console=plain
 
@@ -71,6 +74,6 @@ jobs:
           set -euo pipefail
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest Liburuville.apk \
-            --title "Liburuville (última versión)" \
+            --title "Liburuville · ${GITHUB_SHA::7} · $(TZ=America/Lima date +'%d/%m %H:%M')" \
             --notes "Compilado desde ${GITHUB_SHA::7}. Descarga Liburuville.apk desde el móvil o la tablet para instalar o actualizar." \
             --latest

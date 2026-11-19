@@ -2219,4 +2219,26 @@
         <item quantity="one">Your record is %1$d day.</item>
         <item quantity="other">Your record is %1$d days.</item>
     </plurals>
+    <string name="liburu_appearance">Liburuville appearance</string>
+    <string name="liburu_background">Background colour</string>
+    <string name="liburu_bg_auto">Automatic</string>
+    <string name="liburu_accent">Accent colour</string>
+    <string name="liburu_goals_settings">Goals</string>
+    <string name="liburu_goal_minutes">Minutes a day</string>
+    <string name="liburu_goal_books">Books a year</string>
+    <string name="liburu_your_name">Your name (Home greeting)</string>
+    <string name="liburu_c_crema">Cream</string>
+    <string name="liburu_c_papel">Paper</string>
+    <string name="liburu_c_blanco">White</string>
+    <string name="liburu_c_arena">Sand</string>
+    <string name="liburu_c_salvia">Sage</string>
+    <string name="liburu_c_rosa">Pink</string>
+    <string name="liburu_c_niebla">Mist</string>
+    <string name="liburu_c_grafito">Graphite</string>
+    <string name="liburu_c_noche">Night</string>
+    <string name="liburu_c_terracota">Terracotta</string>
+    <string name="liburu_c_azul">Blue</string>
+    <string name="liburu_c_verde">Green</string>
+    <string name="liburu_c_morado">Purple</string>
+    <string name="liburu_c_tinta">Ink</string>
 </resources>

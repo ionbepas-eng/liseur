@@ -312,7 +312,7 @@ private fun DeskCard(
 
 /** A line from a book already read; opening it goes to the passage. */
 @Composable
-private fun QuoteCard(
+internal fun QuoteCard(
     quote: HomeQuote,
     onOpen: () -> Unit,
     onAnother: () -> Unit,

@@ -148,7 +148,7 @@ fun MainTabBar(
                 .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            MainTab.entries.filter { it != MainTab.SERIES || hasSeries }.forEach { tab ->
+            MainTab.entries.filter { it != MainTab.SERIES }.forEach { tab ->
                 TabItem(
                     tab = tab,
                     selected = tab == selected,

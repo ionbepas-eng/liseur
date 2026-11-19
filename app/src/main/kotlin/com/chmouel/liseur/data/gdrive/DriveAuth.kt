@@ -115,6 +115,11 @@ object DriveAuth {
         _signedIn.tryEmit(result)
     }
 
+    /** The first name of the signed-in account, for the Home greeting. */
+    fun saveName(name: String) {
+        app.getSharedPreferences("liburu", Context.MODE_PRIVATE).edit().putString("name", name).apply()
+    }
+
     fun saveRefreshToken(token: String) {
         prefs().edit().putString(KEY_REFRESH, CredentialCipher.encrypt(token)).apply()
     }

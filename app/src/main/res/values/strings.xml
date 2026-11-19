@@ -2198,4 +2198,25 @@
     <string name="notes_filter_highlights">Highlights</string>
     <string name="notes_filter_notes">Notes</string>
     <string name="notes_empty">Your highlights and notes from every book will appear here.</string>
+    <string name="liburu_hello">Hello, %1$s</string>
+    <string name="liburu_hello_plain">Hello</string>
+    <string name="liburu_continue">Continue</string>
+    <string name="liburu_next">Your next read</string>
+    <string name="liburu_next_sub">Unstarted books that suit you best</string>
+    <string name="liburu_goals">Reading goals</string>
+    <string name="liburu_goals_sub">Read every day, grow your stats and finish more books.</string>
+    <string name="liburu_today">Today's reading</string>
+    <string name="liburu_of_goal">of your %1$d min goal</string>
+    <string name="liburu_keep_reading">Keep reading</string>
+    <string name="liburu_read_this_year">Books read this year · %1$d / %2$d</string>
+    <string name="liburu_book_percent">Book · %1$d %%</string>
+    <string name="liburu_series_volume">book %1$s</string>
+    <plurals name="liburu_streak">
+        <item quantity="one">%1$d day in a row</item>
+        <item quantity="other">%1$d days in a row</item>
+    </plurals>
+    <plurals name="liburu_record">
+        <item quantity="one">Your record is %1$d day.</item>
+        <item quantity="other">Your record is %1$d days.</item>
+    </plurals>
 </resources>

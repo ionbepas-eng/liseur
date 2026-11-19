@@ -2122,4 +2122,27 @@
     <string name="notes_filter_highlights">Subrayados</string>
     <string name="notes_filter_notes">Notas</string>
     <string name="notes_empty">Aquí aparecerán tus subrayados y notas de todos los libros.</string>
+    <string name="liburu_hello">Hola, %1$s</string>
+    <string name="liburu_hello_plain">Hola</string>
+    <string name="liburu_continue">Continuar</string>
+    <string name="liburu_next">Tu próxima lectura</string>
+    <string name="liburu_next_sub">Tus libros sin empezar que más encajan contigo</string>
+    <string name="liburu_goals">Objetivos de lectura</string>
+    <string name="liburu_goals_sub">Lee todos los días, sube tus estadísticas y termina más libros.</string>
+    <string name="liburu_today">Lectura de hoy</string>
+    <string name="liburu_of_goal">de tu objetivo de %1$d min</string>
+    <string name="liburu_keep_reading">Seguir leyendo</string>
+    <string name="liburu_read_this_year">Libros leídos este año · %1$d / %2$d</string>
+    <string name="liburu_book_percent">Libro · %1$d %%</string>
+    <string name="liburu_series_volume">libro %1$s</string>
+    <plurals name="liburu_streak">
+        <item quantity="one">%1$d día seguido</item>
+        <item quantity="many">%1$d días seguidos</item>
+        <item quantity="other">%1$d días seguidos</item>
+    </plurals>
+    <plurals name="liburu_record">
+        <item quantity="one">Tu récord es de %1$d día.</item>
+        <item quantity="many">Tu récord es de %1$d días.</item>
+        <item quantity="other">Tu récord es de %1$d días.</item>
+    </plurals>
 </resources>

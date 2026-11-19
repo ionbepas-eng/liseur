@@ -42,6 +42,8 @@ class DriveSetupClient(private val http: OkHttpClient = DriveAuth.client()) : Se
                 }
                 val user = JSONObject(response.body.string()).optJSONObject("user")
                 val email = user?.optString("emailAddress").orEmpty()
+                user?.optString("displayName")?.substringBefore(' ')?.takeIf { it.isNotBlank() }
+                    ?.let(DriveAuth::saveName)
                 SetupResult.Success(
                     ServerCapabilities(
                         baseUrl = DriveAuth.BASE_URL,

@@ -1018,7 +1018,23 @@ fun LibraryScreen(
 
                     // Home is drawn from the whole shelf, so it comes before
                     // the empty states that only the Library's filters cause.
-                    showHome -> HomeLibrary(
+                    showHome -> com.chmouel.liseur.ui.library.styles.LiburuHome(
+                        state = state,
+                        listState = homeState,
+                        quote = homeQuote,
+                        onOpenQuote = onOpenQuote,
+                        onAnotherQuote = onAnotherQuote,
+                        onBookSelected = openShelfBook,
+                        onBookLongPress = { sheetBook = it },
+                        onBrowseAll = {
+                            onSetReadingFilter(setOf(LibraryFilterOption.UNREAD))
+                            showCatalogue(false)
+                        },
+                        bottomInset = bottomInset,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                    false && showHome -> HomeLibrary(
                         state = state,
                         hero = heroDetail,
                         quote = homeQuote,

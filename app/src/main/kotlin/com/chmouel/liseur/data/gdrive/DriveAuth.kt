@@ -120,6 +120,18 @@ object DriveAuth {
         app.getSharedPreferences("liburu", Context.MODE_PRIVATE).edit().putString("name", name).apply()
     }
 
+    /** Asks Google for the account's first name when the greeting has none yet. Blocking. */
+    fun fetchNameBlocking(): String? = runCatching {
+        if (refreshToken() == null) return null
+        client().newCall(
+            Request.Builder().url("$BASE_URL/about?fields=user(displayName)").build(),
+        ).execute().use { response ->
+            if (!response.isSuccessful) return null
+            JSONObject(response.body.string()).optJSONObject("user")?.optString("displayName")
+                ?.substringBefore(' ')?.takeIf { it.isNotBlank() }?.also(::saveName)
+        }
+    }.getOrNull()
+
     fun saveRefreshToken(token: String) {
         prefs().edit().putString(KEY_REFRESH, CredentialCipher.encrypt(token)).apply()
     }

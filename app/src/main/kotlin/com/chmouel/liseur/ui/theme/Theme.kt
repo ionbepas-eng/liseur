@@ -11,6 +11,8 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -321,7 +323,7 @@ fun LiseurTheme(
             page = readingPage,
             eInk = eInk,
         )
-    } else if (palette == EInkPalette.NONE && !usesWallpaperColours(palette, dynamicColor)) {
+    } else if (palette == EInkPalette.NONE) {
         // Liburuville: the background and accent chosen in Settings.
         LiburuAppearance.init(context)
         val look by LiburuAppearance.look.collectAsState()
@@ -332,9 +334,22 @@ fun LiseurTheme(
     }
 
     val typography = remember { liseurTypography(frauncesFamily(context.assets)) }
+    val wall = if (readingPage == null && palette == EInkPalette.NONE) {
+        LiburuAppearance.init(context)
+        LiburuAppearance.look.collectAsState().value.let(LiburuAppearance::wallpaper)
+    } else null
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
-        content = content,
-    )
+    ) {
+        if (wall == null) {
+            content()
+        } else {
+            androidx.compose.foundation.layout.Box(
+                androidx.compose.ui.Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(wall.colors)),
+            ) { content() }
+        }
+    }
 }

@@ -77,12 +77,12 @@ object LiburuPrefs {
 private data class Rhythm(val minutesToday: Int, val week: List<Boolean>, val streak: Int, val record: Int)
 
 private fun rhythmOf(sessions: List<ReadingSession>, today: LocalDate, zone: ZoneId): Rhythm {
-    val minutesByDay = HashMap<LocalDate, Long>()
-    for (s in sessions) {
-        val day = Instant.ofEpochMilli(s.startedAt).atZone(zone).toLocalDate()
-        minutesByDay[day] = (minutesByDay[day] ?: 0L) + s.durationMs
-    }
-    val read = minutesByDay.filterValues { it >= 60_000 }.keys
+    // Same rule as the statistics: a sitting counts on the day it ended.
+    val byDay = sessions
+        .filter { it.durationMs > 0 }
+        .groupBy { Instant.ofEpochMilli(it.endedAt ?: it.lastCheckpointAt).atZone(zone).toLocalDate() }
+        .mapValues { (_, day) -> day.sumOf { it.durationMs } }
+    val read = byDay.keys
     val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
     val week = (0..6).map { read.contains(monday.plusDays(it.toLong())) }
     var streak = 0
@@ -96,7 +96,7 @@ private fun rhythmOf(sessions: List<ReadingSession>, today: LocalDate, zone: Zon
         record = maxOf(record, run)
         prev = d
     }
-    return Rhythm(((minutesByDay[today] ?: 0L) / 60_000).toInt(), week, streak, maxOf(record, streak))
+    return Rhythm(((byDay[today] ?: 0L) / 60_000).toInt(), week, streak, maxOf(record, streak))
 }
 
 /** The next unread books worth starting: the next volume of a series under way first. */
@@ -132,7 +132,13 @@ internal fun LiburuHome(
     }
     val rhythm by rhythmFlow.collectAsState(initial = Rhythm(0, List(7) { false }, 0, 0))
     val goal = LiburuPrefs.dailyGoal(context)
-    val name = LiburuPrefs.name(context)
+    val name by androidx.compose.runtime.produceState(LiburuPrefs.name(context)) {
+        if (value == null) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.chmouel.liseur.data.gdrive.DriveAuth.fetchNameBlocking()
+            }
+        }
+    }
     val locale = Locale.getDefault()
     val today = LocalDate.now(zone)
 
@@ -160,8 +166,10 @@ internal fun LiburuHome(
                         .replaceFirstChar { it.titlecase(locale) }
                     Text(date, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        if (name.isNullOrBlank()) stringResource(R.string.liburu_hello_plain)
-                        else stringResource(R.string.liburu_hello, name),
+                        name.let { n ->
+                            if (n.isNullOrBlank()) stringResource(R.string.liburu_hello_plain)
+                            else stringResource(R.string.liburu_hello, n)
+                        },
                         style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
                     )
                 }

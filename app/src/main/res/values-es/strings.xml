@@ -2167,4 +2167,12 @@
     <string name="liburu_c_verde">Verde</string>
     <string name="liburu_c_morado">Morado</string>
     <string name="liburu_c_tinta">Tinta</string>
+    <string name="liburu_wallpaper">Fondo de pantalla</string>
+    <string name="liburu_wall_none">Ninguno</string>
+    <string name="liburu_w_atardecer">Atardecer</string>
+    <string name="liburu_w_lavanda">Lavanda</string>
+    <string name="liburu_w_oceano">Océano</string>
+    <string name="liburu_w_pradera">Pradera</string>
+    <string name="liburu_w_bosque">Bosque</string>
+    <string name="liburu_w_medianoche">Medianoche</string>
 </resources>

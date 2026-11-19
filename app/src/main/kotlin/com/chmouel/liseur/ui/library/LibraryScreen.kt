@@ -652,6 +652,8 @@ fun LibraryScreen(
                                 text = stringResource(R.string.filter_archived),
                                 style = MaterialTheme.typography.titleLarge,
                             )
+                        } else if (showHome) {
+                            // Liburuville: Home's own greeting is its header.
                         } else {
                             Row(
                                 modifier = Modifier

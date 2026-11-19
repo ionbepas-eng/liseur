@@ -62,6 +62,21 @@ internal fun LiburuSettings() {
                 }
             }
             Text(
+                stringResource(R.string.liburu_wallpaper),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                WallpaperSwatch(null, stringResource(R.string.liburu_wall_none), look.wallpaper == null) {
+                    LiburuAppearance.setWallpaper(null)
+                }
+                LiburuAppearance.wallpapers.forEach { wall ->
+                    WallpaperSwatch(wall.colors, swatchName(wall.key), look.wallpaper == wall.key) {
+                        LiburuAppearance.setWallpaper(wall.key)
+                    }
+                }
+            }
+            Text(
                 stringResource(R.string.liburu_accent),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 8.dp),
@@ -141,6 +156,33 @@ private fun Swatch(color: Color?, label: String, selected: Boolean, onClick: () 
 }
 
 @Composable
+private fun WallpaperSwatch(colors: List<Color>?, label: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp).clickable(onClick = onClick)) {
+        Box(
+            Modifier
+                .size(width = 76.dp, height = 104.dp)
+                .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+                .padding(if (selected) 4.dp else 1.dp)
+                .background(
+                    if (colors != null) androidx.compose.ui.graphics.Brush.verticalGradient(colors)
+                    else androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    shape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (colors == null) Text("×", style = MaterialTheme.typography.headlineMedium)
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
+            maxLines = 1,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+@Composable
 private fun swatchName(key: String): String = stringResource(
     when (key) {
         "crema" -> R.string.liburu_c_crema
@@ -156,6 +198,12 @@ private fun swatchName(key: String): String = stringResource(
         "azul" -> R.string.liburu_c_azul
         "verde" -> R.string.liburu_c_verde
         "morado" -> R.string.liburu_c_morado
+        "atardecer" -> R.string.liburu_w_atardecer
+        "lavanda" -> R.string.liburu_w_lavanda
+        "oceano" -> R.string.liburu_w_oceano
+        "pradera" -> R.string.liburu_w_pradera
+        "bosque" -> R.string.liburu_w_bosque
+        "medianoche" -> R.string.liburu_w_medianoche
         else -> R.string.liburu_c_tinta
     },
 )

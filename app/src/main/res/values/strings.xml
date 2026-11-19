@@ -2241,4 +2241,12 @@
     <string name="liburu_c_verde">Green</string>
     <string name="liburu_c_morado">Purple</string>
     <string name="liburu_c_tinta">Ink</string>
+    <string name="liburu_wallpaper">Wallpaper</string>
+    <string name="liburu_wall_none">None</string>
+    <string name="liburu_w_atardecer">Sunset</string>
+    <string name="liburu_w_lavanda">Lavender</string>
+    <string name="liburu_w_oceano">Ocean</string>
+    <string name="liburu_w_pradera">Meadow</string>
+    <string name="liburu_w_bosque">Forest</string>
+    <string name="liburu_w_medianoche">Midnight</string>
 </resources>

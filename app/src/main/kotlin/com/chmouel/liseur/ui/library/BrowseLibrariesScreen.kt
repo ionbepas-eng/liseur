@@ -491,7 +491,7 @@ private fun BrowseConnectionScreen(
     }
     val ready = !busy && address.isNotBlank() && when (kind) {
         ServerKind.CALIBRE, ServerKind.BOOKORBIT -> username.isNotBlank() && password.isNotBlank()
-        ServerKind.KOMGA -> apiKey.isNotBlank()
+        ServerKind.KOMGA, ServerKind.DRIVE -> apiKey.isNotBlank()
         ServerKind.LISEUR_SYNC -> when (signIn) {
             LiseurSyncSignIn.PASSWORD -> username.isNotBlank() && password.isNotBlank()
             LiseurSyncSignIn.TOKEN -> deviceToken.isNotBlank()
@@ -611,7 +611,7 @@ private fun BrowseConnectionScreen(
                     textField(password, { password = it }, R.string.server_password_optional, true, ImeAction.Done)
                     FieldHelp(stringResource(R.string.server_custom_credentials_help))
                 }
-                ServerKind.KOMGA -> {
+                ServerKind.KOMGA, ServerKind.DRIVE -> {
                     textField(apiKey, { apiKey = it }, R.string.server_api_key, true, ImeAction.Done)
                     FieldHelp(stringResource(R.string.server_api_key_help))
                 }

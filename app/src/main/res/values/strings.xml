@@ -2184,4 +2184,11 @@
     <string name="evaluation_rated">Rated</string>
     <string name="evaluation_unrated">Unrated</string>
     <string name="no_file_picker">No file picker is available on this device</string>
+    <string name="server_kind_drive">Google Drive</string>
+    <string name="server_tagline_drive">Your «Libros» folder in Google Drive</string>
+    <string name="server_link_drive">Open Google Drive</string>
+    <string name="server_drive_intro">Sign in with Google to use your «Libros» folder in Drive as your library. Books download when you open them.</string>
+    <string name="server_drive_sign_in">Sign in with Google</string>
+    <string name="server_drive_failed">Google sign-in did not finish. Try again.</string>
+    <string name="server_drive_storage_note">Your Google session is kept encrypted on this device. Liburuville only reads your Drive.</string>
 </resources>

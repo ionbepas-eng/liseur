@@ -144,7 +144,7 @@ data class WorkConfirmation(
 
 data class ServerAccountUiState(
     val server: RemoteServer? = null,
-    val kind: ServerKind = ServerKind.CALIBRE,
+    val kind: ServerKind = ServerKind.DRIVE,
     val url: String = "",
     val username: String = "",
     val password: String = "",
@@ -495,6 +495,10 @@ class ServerAccountViewModel(
                     beforePublish = stopDownloads,
                 )
             }
+            ServerKind.DRIVE -> repository.connectDrive(
+                refreshToken = current.apiKey.trim(),
+                beforePublish = stopDownloads,
+            )
             ServerKind.BOOKORBIT -> repository.connectBookOrbit(
                 url = current.url,
                 username = current.username.trim(),
@@ -885,7 +889,7 @@ class ServerAccountViewModel(
     /** Whether enough of the form is filled in to be worth trying. */
     private fun ServerAccountUiState.credentialsSupplied(): Boolean = when (kind) {
         ServerKind.CALIBRE -> username.isNotBlank() && password.isNotBlank()
-        ServerKind.KOMGA -> apiKey.isNotBlank()
+        ServerKind.KOMGA, ServerKind.DRIVE -> apiKey.isNotBlank()
         ServerKind.LISEUR_SYNC -> when (liseurSyncSignIn) {
             LiseurSyncSignIn.PASSWORD -> username.isNotBlank() && password.isNotBlank()
             LiseurSyncSignIn.TOKEN -> deviceToken.isNotBlank()
@@ -911,7 +915,7 @@ class ServerAccountViewModel(
 
     /** The same test the Connect button is enabled by. */
     internal fun ServerAccountUiState.readyToConnect(): Boolean =
-        credentialsSupplied() && (kind == ServerKind.CUSTOM || url.isNotBlank())
+        credentialsSupplied() && (kind == ServerKind.CUSTOM || kind == ServerKind.DRIVE || url.isNotBlank())
 
     /**
      * Works out what fetching everything would cost, and shows it.

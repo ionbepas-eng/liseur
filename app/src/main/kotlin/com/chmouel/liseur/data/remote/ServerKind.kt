@@ -88,6 +88,9 @@ enum class ServerKind(
      * switch. See `OpdsIdentity`.
      */
     CUSTOM("custom"),
+
+    /** Google Drive (Liburuville): the «Libros» folder as the catalog. */
+    DRIVE("gdrive"),
     ;
 
     /**
@@ -109,7 +112,7 @@ enum class ServerKind(
      */
     val linksAreAbsolute: Boolean
         get() = when (this) {
-            CUSTOM -> true
+            CUSTOM, DRIVE -> true
             CALIBRE, KOMGA, LISEUR_SYNC, BOOKORBIT -> false
         }
 
@@ -150,7 +153,7 @@ enum class ServerKind(
             // BookOrbit hands the password in for a renewable session,
             // the way liseur-sync trades one for a device token, so
             // neither keeps the password.
-            KOMGA, LISEUR_SYNC, BOOKORBIT -> false
+            KOMGA, LISEUR_SYNC, BOOKORBIT, DRIVE -> false
         }
 
     /**
@@ -174,7 +177,7 @@ enum class ServerKind(
     val hostsKosyncPeer: Boolean
         get() = when (this) {
             CUSTOM -> true
-            CALIBRE, KOMGA, LISEUR_SYNC, BOOKORBIT -> false
+            CALIBRE, KOMGA, LISEUR_SYNC, BOOKORBIT, DRIVE -> false
         }
 
     /**
@@ -193,7 +196,7 @@ enum class ServerKind(
         get() = when (this) {
             CALIBRE -> SyncAbility.PROGRESSION
             KOMGA, LISEUR_SYNC -> SyncAbility.EXACT
-            CUSTOM -> SyncAbility.NONE
+            CUSTOM, DRIVE -> SyncAbility.NONE
             BOOKORBIT -> if (com.chmouel.liseur.data.bookorbit.BookOrbitPositionSync.AUTOMATIC_SYNC_ENABLED) {
                 SyncAbility.EXACT
             } else SyncAbility.NONE

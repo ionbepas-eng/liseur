@@ -381,6 +381,20 @@ class RemoteAccountRepository(
     )
 
     /**
+     * Connects Google Drive with the refresh token a sign-in produced.
+     */
+    suspend fun connectDrive(
+        refreshToken: String,
+        beforePublish: suspend () -> Unit = {},
+    ): SetupResult = connect(
+        kind = ServerKind.DRIVE,
+        url = com.chmouel.liseur.data.gdrive.DriveAuth.BASE_URL,
+        credentials = RemoteCredentials.ApiKey(refreshToken),
+        allowHttp = false,
+        beforePublish = beforePublish,
+    )
+
+    /**
      * Signs into a BookOrbit server and keeps the session it mints.
      *
      * The password goes no further than the probe. BookOrbit offers a

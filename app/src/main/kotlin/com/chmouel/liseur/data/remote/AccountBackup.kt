@@ -74,7 +74,7 @@ internal object AccountBackup {
         )
         require(when (kind) {
             ServerKind.CALIBRE -> server.username != null && server.passwordCipher != null
-            ServerKind.KOMGA -> server.apiKeyCipher != null
+            ServerKind.KOMGA, ServerKind.DRIVE -> server.apiKeyCipher != null
             ServerKind.LISEUR_SYNC -> server.accountId == null && server.liseurTokenCipher == null
             ServerKind.BOOKORBIT -> server.orbitAccessCipher != null && server.orbitRefreshCipher != null
             ServerKind.CUSTOM -> server.passwordCipher == null || server.username != null

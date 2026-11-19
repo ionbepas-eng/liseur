@@ -2108,4 +2108,11 @@
     <string name="evaluation_rated">Con valoración</string>
     <string name="evaluation_unrated">Sin valoración</string>
     <string name="no_file_picker">No hay ningún selector de archivos disponible en este dispositivo</string>
+    <string name="server_kind_drive">Google Drive</string>
+    <string name="server_tagline_drive">Tu carpeta «Libros» de Google Drive</string>
+    <string name="server_link_drive">Abrir Google Drive</string>
+    <string name="server_drive_intro">Inicia sesión con Google para usar tu carpeta «Libros» de Drive como biblioteca. Los libros se descargan al abrirlos.</string>
+    <string name="server_drive_sign_in">Iniciar sesión con Google</string>
+    <string name="server_drive_failed">No se completó el inicio de sesión con Google. Inténtalo de nuevo.</string>
+    <string name="server_drive_storage_note">Tu sesión de Google se guarda cifrada en este dispositivo. Liburuville solo lee tu Drive.</string>
 </resources>

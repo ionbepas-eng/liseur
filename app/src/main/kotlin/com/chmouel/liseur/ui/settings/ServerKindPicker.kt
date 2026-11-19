@@ -113,7 +113,9 @@ internal fun ServerKindSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
             )
-            ServerKind.entries.forEach { kind ->
+            // Liburuville: the library lives in Google Drive; the server kinds
+            // inherited from Liseur stay in the code but are not offered.
+            listOf(ServerKind.DRIVE).forEach { kind ->
                 ListItem(
                     modifier = Modifier.selectable(
                         selected = kind == selected,
@@ -152,6 +154,7 @@ private fun ServerKind.logoRes(): Int = when (this) {
     ServerKind.LISEUR_SYNC -> R.drawable.ic_server_liseur_sync
     ServerKind.BOOKORBIT -> R.drawable.ic_server_bookorbit
     ServerKind.CUSTOM -> R.drawable.ic_server_custom
+    ServerKind.DRIVE -> R.drawable.ic_server_drive
 }
 
 /**
@@ -190,6 +193,7 @@ internal fun ServerKind.labelRes(): Int = when (this) {
     ServerKind.LISEUR_SYNC -> R.string.server_kind_liseur_sync
     ServerKind.BOOKORBIT -> R.string.server_kind_bookorbit
     ServerKind.CUSTOM -> R.string.server_kind_custom
+    ServerKind.DRIVE -> R.string.server_kind_drive
 }
 
 internal fun ServerKind.taglineRes(): Int = when (this) {
@@ -198,6 +202,7 @@ internal fun ServerKind.taglineRes(): Int = when (this) {
     ServerKind.LISEUR_SYNC -> R.string.server_tagline_liseur_sync
     ServerKind.BOOKORBIT -> R.string.server_tagline_bookorbit
     ServerKind.CUSTOM -> R.string.server_tagline_custom
+    ServerKind.DRIVE -> R.string.server_tagline_drive
 }
 
 /** Where to get a liseur-sync server, for a reader who has not got one yet. */
@@ -216,6 +221,7 @@ internal fun ServerKind.homeUrl(): String = when (this) {
     // not a server anyone can go and get, it is whatever the reader
     // already runs.
     ServerKind.CUSTOM -> "https://specs.opds.io/opds-1.2"
+    ServerKind.DRIVE -> "https://drive.google.com"
 }
 
 internal fun ServerKind.linkRes(): Int = when (this) {
@@ -224,4 +230,5 @@ internal fun ServerKind.linkRes(): Int = when (this) {
     ServerKind.LISEUR_SYNC -> R.string.liseur_sync_get_one
     ServerKind.BOOKORBIT -> R.string.server_link_bookorbit
     ServerKind.CUSTOM -> R.string.server_link_custom
+    ServerKind.DRIVE -> R.string.server_link_drive
 }

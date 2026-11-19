@@ -310,6 +310,7 @@ fun ServerAccountScreen(
                 val secretNote = when (server?.kind ?: state.kind) {
                     ServerKind.CALIBRE -> R.string.server_password_storage_note
                     ServerKind.KOMGA -> R.string.server_api_key_storage_note
+                    ServerKind.DRIVE -> R.string.server_drive_storage_note
                     ServerKind.LISEUR_SYNC -> R.string.server_token_storage_note
                     ServerKind.BOOKORBIT -> R.string.server_bookorbit_storage_note
                     // With no catalog connected there is no catalog
@@ -632,6 +633,10 @@ private fun ConnectForm(
      */
     addressOnly: Boolean = false,
 ) {
+    if (state.kind == ServerKind.DRIVE) {
+        DriveConnectForm(state = state, onApiKeyChange = onApiKeyChange, onConnect = onConnect, prompt = prompt)
+        return
+    }
     var picking by rememberSaveable { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     // The row and its link are one thing, so they share a gap rather
@@ -901,6 +906,51 @@ private fun ConnectForm(
     }
 }
 
+/** Google Drive: one button, Google's own consent page, and back. */
+@Composable
+private fun DriveConnectForm(
+    state: ServerAccountUiState,
+    onApiKeyChange: (String) -> Unit,
+    onConnect: (Boolean) -> Unit,
+    prompt: LocalNetworkPrompt,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var failed by rememberSaveable { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.chmouel.liseur.data.gdrive.DriveAuth.signedIn.collect { result ->
+            com.chmouel.liseur.data.gdrive.DriveAuth.consumed()
+            result.onSuccess { token ->
+                failed = false
+                onApiKeyChange(token)
+                onConnect(false)
+            }.onFailure { failed = true }
+        }
+    }
+    Text(
+        stringResource(R.string.server_drive_intro),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (failed) {
+        Notice(stringResource(R.string.server_drive_failed), NoticeTone.PROBLEM)
+    }
+    ConnectError(state = state, onConnect = onConnect, prompt = prompt)
+    Button(
+        onClick = { com.chmouel.liseur.data.gdrive.DriveAuth.startSignIn(context) },
+        enabled = !state.connecting,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (state.connecting) {
+            BusyIndicator(
+                Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        } else {
+            Text(stringResource(R.string.server_drive_sign_in))
+        }
+    }
+}
+
 /**
  * What went wrong with the last attempt, and the one offer worth making
  * about it: retrying an unreachable https address over http.
@@ -1077,6 +1127,7 @@ private fun ConnectedCard(
                     ServerKind.LISEUR_SYNC -> R.string.server_no_download_right_liseur_sync
                     ServerKind.BOOKORBIT -> R.string.server_no_download_right_bookorbit
                     ServerKind.CUSTOM -> R.string.server_no_download_right_custom
+                    ServerKind.DRIVE -> R.string.server_drive_failed
                 },
             ),
             tone = NoticeTone.PROBLEM,
@@ -1742,6 +1793,7 @@ internal fun AccountError.messageRes(kind: ServerKind): Int = when (this) {
         ServerKind.LISEUR_SYNC -> R.string.server_error_credentials_liseur_sync
         ServerKind.BOOKORBIT -> R.string.server_error_credentials_bookorbit
         ServerKind.CUSTOM -> R.string.server_error_credentials_custom
+        ServerKind.DRIVE -> R.string.server_drive_failed
     }
     // Only a Custom catalog is ever connected to anonymously, so this
     // is the only kind that can reach here. The others keep their own
@@ -1756,6 +1808,7 @@ internal fun AccountError.messageRes(kind: ServerKind): Int = when (this) {
         ServerKind.LISEUR_SYNC -> R.string.server_error_not_liseur_sync
         ServerKind.BOOKORBIT -> R.string.server_error_not_bookorbit
         ServerKind.CUSTOM -> R.string.server_error_not_custom
+        ServerKind.DRIVE -> R.string.server_drive_failed
     }
     AccountError.UNREACHABLE -> R.string.server_error_unreachable
     AccountError.UNREACHABLE_TRY_HTTP -> R.string.server_error_https

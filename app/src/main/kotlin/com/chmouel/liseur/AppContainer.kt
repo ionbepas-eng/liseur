@@ -604,6 +604,9 @@ class AppContainer(
             ServerKind.KOMGA to
                 com.chmouel.liseur.data.komga
                     .KomgaSetupClient(),
+            ServerKind.DRIVE to
+                com.chmouel.liseur.data.gdrive
+                    .DriveSetupClient(),
             ServerKind.LISEUR_SYNC to
                 LiseurSyncServerSetup(
                     deviceName = { deviceIdentity.current().name },
@@ -840,6 +843,7 @@ class AppContainer(
                 mapOf(
                     ServerKind.CALIBRE to CalibreCatalogClient(),
                     ServerKind.KOMGA to KomgaCatalogClient(),
+                    ServerKind.DRIVE to com.chmouel.liseur.data.gdrive.DriveCatalogClient(),
                     ServerKind.LISEUR_SYNC to LiseurSyncCatalogClient(),
                     ServerKind.CUSTOM to
                         com.chmouel.liseur.data.opds
@@ -870,6 +874,7 @@ class AppContainer(
                 mapOf(
                     ServerKind.CALIBRE to CalibreFileSource(),
                     ServerKind.KOMGA to KomgaFileSource(),
+                    ServerKind.DRIVE to com.chmouel.liseur.data.gdrive.DriveFileSource(),
                     ServerKind.LISEUR_SYNC to LiseurSyncFileSource(),
                     ServerKind.CUSTOM to
                         com.chmouel.liseur.data.opds

@@ -200,6 +200,11 @@ data class RemoteServer(
             ServerKind.KOMGA ->
                 apiKeyCipher?.let(CredentialCipher::decrypt)?.let(RemoteCredentials::ApiKey)
 
+            // Google Drive keeps its refresh token here; requests are signed
+            // by DriveAuth with a fresh access token, so nothing is sent as-is.
+            ServerKind.DRIVE ->
+                apiKeyCipher?.let(CredentialCipher::decrypt)?.let { RemoteCredentials.Deferred }
+
             ServerKind.LISEUR_SYNC ->
                 liseurTokenCipher?.let(CredentialCipher::decrypt)?.let(RemoteCredentials::Bearer)
 
@@ -252,7 +257,7 @@ data class RemoteServer(
         get() = when (kind) {
             ServerKind.CALIBRE -> koboTokenCipher != null
             ServerKind.KOMGA, ServerKind.LISEUR_SYNC -> true
-            ServerKind.CUSTOM -> false
+            ServerKind.CUSTOM, ServerKind.DRIVE -> false
             ServerKind.BOOKORBIT ->
                 com.chmouel.liseur.data.bookorbit.BookOrbitPositionSync.AUTOMATIC_SYNC_ENABLED &&
                     (orbitAccessCipher != null || orbitRefreshCipher != null)
@@ -275,6 +280,7 @@ data class RemoteServer(
         get() = when (kind) {
             ServerKind.CALIBRE -> "$baseUrl|$username|${userId ?: -1}"
             ServerKind.KOMGA -> "$baseUrl|$username|${accountId ?: "-1"}"
+            ServerKind.DRIVE -> "gdrive|${accountId ?: username}"
             // The liseur-sync spelling is the one the old sync-only
             // account already wrote into `sync_peer_state` and
             // `work_alias`, and the migration carries it across: the

@@ -80,6 +80,21 @@
         </activity>
 
         <activity
+            android:name=".data.gdrive.DriveAuthActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.googleusercontent.apps.175081491604-636f4hdfd431llkv538cd91v108qluf7" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".reader.ReaderActivity"
             android:windowSoftInputMode="adjustResize"
             android:exported="true"

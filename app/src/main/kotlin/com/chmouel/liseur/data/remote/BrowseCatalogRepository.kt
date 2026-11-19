@@ -198,7 +198,7 @@ class BrowseCatalogRepository(
     ): BrowseConnectionResult {
         val credential = when (kind) {
             ServerKind.CALIBRE, ServerKind.BOOKORBIT -> RemoteCredentials.Basic(username.trim(), password)
-            ServerKind.KOMGA -> RemoteCredentials.ApiKey(apiKey.trim())
+            ServerKind.KOMGA, ServerKind.DRIVE -> RemoteCredentials.ApiKey(apiKey.trim())
             ServerKind.LISEUR_SYNC -> if (deviceToken.isNotBlank()) {
                 RemoteCredentials.Bearer(deviceToken.trim())
             } else {
@@ -469,7 +469,7 @@ class BrowseCatalogRepository(
         ServerKind.LISEUR_SYNC -> book.folderId?.let { "folder:$it" }
         ServerKind.KOMGA -> (book.seriesId ?: book.seriesName)?.let { "series:$it" }
         ServerKind.BOOKORBIT -> (book.seriesId ?: book.seriesName)?.let { "series:$it" }
-        ServerKind.CALIBRE, ServerKind.CUSTOM -> book.seriesName?.let { "series:$it" }
+        ServerKind.CALIBRE, ServerKind.CUSTOM, ServerKind.DRIVE -> book.seriesName?.let { "series:$it" }
     }
 
     companion object {

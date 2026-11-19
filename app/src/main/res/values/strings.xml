@@ -2191,4 +2191,11 @@
     <string name="server_drive_sign_in">Sign in with Google</string>
     <string name="server_drive_failed">Google sign-in did not finish. Try again.</string>
     <string name="server_drive_storage_note">Your Google session is kept encrypted on this device. Liburuville only reads your Drive.</string>
+    <string name="library_section_books">Books</string>
+    <string name="library_section_series">Series</string>
+    <string name="library_section_notes">Notes</string>
+    <string name="notes_filter_all">All</string>
+    <string name="notes_filter_highlights">Highlights</string>
+    <string name="notes_filter_notes">Notes</string>
+    <string name="notes_empty">Your highlights and notes from every book will appear here.</string>
 </resources>

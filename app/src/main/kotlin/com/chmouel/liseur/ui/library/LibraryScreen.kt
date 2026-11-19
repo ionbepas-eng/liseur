@@ -535,6 +535,7 @@ fun LibraryScreen(
     val catalogueStyle = if (layout.style == LibraryStyle.HOME) LibraryStyle.CLASSIC else layout.style
     val showHome = !archived && layout.tabs && homeTab
     val showSeries = !showHome && !archived && state.seriesView && state.series.isNotEmpty()
+    var notesShown by rememberSaveable { mutableStateOf(false) }
     val activeStyle = if (showHome) LibraryStyle.HOME else catalogueStyle
     val scrollStyleToTop: (LibraryStyle) -> Unit = { target ->
         scope.launch {
@@ -928,8 +929,31 @@ fun LibraryScreen(
                         onDismiss = onDismissCatalogPartial,
                     )
                 }
+                // Liburuville: Libros · Series · Notas across the top, as on the web.
+                val sectionsShown = !showHome && !archived && state.searchResults == null && !state.loading
+                if (sectionsShown) {
+                    LibrarySections(
+                        selected = when {
+                            notesShown -> 2
+                            showSeries -> 1
+                            else -> 0
+                        },
+                        seriesAvailable = state.series.isNotEmpty(),
+                        onSelect = { section ->
+                            notesShown = section == 2
+                            if (section != 2) showCatalogue(section == 1)
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
                 when {
                     state.loading -> LibrarySkeleton(fillAboveBar)
+
+                    sectionsShown && notesShown -> NotesOverview(
+                        onOpenBook = openShelfBook,
+                        bottomInset = bottomInset,
+                        modifier = Modifier.fillMaxSize(),
+                    )
 
                     // Ahead of every shelf state: a search looks past the
                     // filters and the archive, so the shelf can be empty

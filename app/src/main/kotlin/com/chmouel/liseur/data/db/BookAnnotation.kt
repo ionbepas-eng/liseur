@@ -75,6 +75,10 @@ interface BookAnnotationDao {
     @Query("SELECT COUNT(*) FROM annotations WHERE book_id = :bookId AND kind != 'BOOKMARK'")
     fun observeMarkCount(bookId: String): Flow<Int>
 
+    /** Every highlight and note in the library, newest first (Liburuville's Notes tab). */
+    @Query("SELECT * FROM annotations WHERE kind != 'BOOKMARK' ORDER BY created_at DESC")
+    fun observeAllMarks(): Flow<List<BookAnnotation>>
+
     /** Everything marked anywhere, for a backup. */
     @Query("SELECT * FROM annotations ORDER BY book_id, created_at")
     suspend fun all(): List<BookAnnotation>

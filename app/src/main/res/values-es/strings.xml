@@ -2115,4 +2115,11 @@
     <string name="server_drive_sign_in">Iniciar sesión con Google</string>
     <string name="server_drive_failed">No se completó el inicio de sesión con Google. Inténtalo de nuevo.</string>
     <string name="server_drive_storage_note">Tu sesión de Google se guarda cifrada en este dispositivo. Liburuville solo lee tu Drive.</string>
+    <string name="library_section_books">Libros</string>
+    <string name="library_section_series">Series</string>
+    <string name="library_section_notes">Notas</string>
+    <string name="notes_filter_all">Todo</string>
+    <string name="notes_filter_highlights">Subrayados</string>
+    <string name="notes_filter_notes">Notas</string>
+    <string name="notes_empty">Aquí aparecerán tus subrayados y notas de todos los libros.</string>
 </resources>

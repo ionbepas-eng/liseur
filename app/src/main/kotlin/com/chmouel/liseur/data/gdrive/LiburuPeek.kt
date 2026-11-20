@@ -46,7 +46,8 @@ object LiburuPeek {
     /** Reads up to [limit] Drive books not looked at yet; returns how many it read. */
     suspend fun fill(bookDao: BookDao, limit: Int = 40): Int {
         val d = dir ?: return 0
-        val todo = bookDao.allOnce().filter { it.url.startsWith("gdrive:") && of(it.url.removePrefix("gdrive:")) == null }.take(limit)
+        // Comics read before ComicInfo.xml was looked at are read once more for it.
+        val todo = bookDao.allOnce().filter { it.url.startsWith("gdrive:") && of(it.url.removePrefix("gdrive:")).let { p -> p == null || (p.optBoolean("comic") && !p.has("ci")) } }.take(limit)
         var done = 0
         for (b in todo) {
             val id = b.url.removePrefix("gdrive:")
@@ -151,6 +152,20 @@ object LiburuPeek {
                 .minWithOrNull(compareBy({ it.name.count { c -> c == '/' } }, { it.name.lowercase().replace(Regex("\\d+")) { m -> m.value.padStart(8, '0') } }))
             first?.let { e -> read(id, e)?.let { saveCover(covers, id, it, e.name)?.let { f -> out.put("cover", f) } } }
             out.put("comic", true)
+            // ComicInfo.xml, the tag file comic tools leave inside the archive.
+            val ci = entries.firstOrNull { it.name.substringAfterLast('/').equals("ComicInfo.xml", true) }?.let { read(id, it, 400_000) }?.toString(Charsets.UTF_8)
+            out.put("ci", ci != null)
+            if (ci != null) {
+                fun tag(t: String) = Regex("<$t>([\\s\\S]*?)</$t>", RegexOption.IGNORE_CASE).find(ci)?.groupValues?.get(1)?.let(::unescape)?.trim()?.takeIf { it.isNotEmpty() }
+                tag("Series")?.let { out.put("series", it); tag("Number")?.toDoubleOrNull()?.let { n -> out.put("index", n) } }
+                tag("Summary")?.let { out.put("desc", it.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim().take(4000)) }
+                tag("Year")?.let { y -> out.put("date", y + (tag("Month")?.padStart(2, '0')?.let { "-$it" } ?: "")) }
+                tag("Publisher")?.let { out.put("publisher", it) }
+                tag("LanguageISO")?.let { out.put("lang", it) }
+                tag("GTIN")?.let { out.put("isbn", it) }
+                tag("Writer")?.let { out.put("writer", it) }
+                out.put("subjects", JSONArray(tag("Genre")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.take(6) ?: emptyList<String>()))
+            }
             return out
         }
         val opf = read(id, opfEntry)?.toString(Charsets.UTF_8) ?: return out

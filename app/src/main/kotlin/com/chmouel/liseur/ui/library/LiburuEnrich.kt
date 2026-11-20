@@ -53,10 +53,21 @@ object LiburuEnrich {
     private fun https(u: String?) = u?.replace("http:", "https:")?.replace("&edge=curl", "")
 
     /** Fetches everything again; returns false when nothing at all could be reached. */
+    /** A comic: one the reader has opened as such, or a Drive file that holds pages rather than an EPUB. */
+    fun isComic(bookUrl: String) = LiburuComics.isComic(bookUrl) ||
+        (bookUrl.startsWith("gdrive:") && com.chmouel.liseur.data.gdrive.LiburuPeek.of(bookUrl.removePrefix("gdrive:"))?.optBoolean("comic") == true) ||
+        bookUrl.substringBefore('?').lowercase().let { it.endsWith(".cbz") || it.endsWith(".cbr") }
+
     suspend fun refresh(context: Context, bookUrl: String, title: String, author: String?, isbn: String?, language: String?): Boolean =
         withContext(Dispatchers.IO) {
             val out = JSONObject().put("t", System.currentTimeMillis())
-            val gb = runCatching { google(title, author, isbn, language) }.getOrNull()
+            // Comics: an ISBN (a tomo) still goes to Google Books first; an issue goes to the Grand Comics Database.
+            val comic = isComic(bookUrl)
+            val bookIsbn = isbn?.filter(Char::isDigit)?.takeIf { (it.length == 13 && (it.startsWith("978") || it.startsWith("979"))) || it.length == 10 }
+            val gb = if (comic) {
+                (bookIsbn?.let { runCatching { google(title, author, it, language) }.getOrNull() })
+                    ?: runCatching { LiburuComicInfo.lookup(title, language) }.getOrNull()
+            } else runCatching { google(title, author, isbn, language) }.getOrNull()
             gb?.let { out.put("gb", it) }
             val by = runCatching { byAuthor(title, author) }.getOrNull()
             by?.let { out.put("byAuthor", it) }

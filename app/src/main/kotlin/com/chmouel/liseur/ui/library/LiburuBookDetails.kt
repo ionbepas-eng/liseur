@@ -211,8 +211,8 @@ internal fun LiburuBookDetails(
                         val text = edits["synopsis"] ?: epub ?: gbDesc
                         val sourceName = when {
                             edits["synopsis"] != null -> stringResource(R.string.liburu_bd_src_you)
-                            epub != null -> "EPUB"
-                            else -> "Google Books"
+                            epub != null -> if (LiburuEnrich.isComic(original.book.url)) "ComicInfo" else "EPUB"
+                            else -> net?.optJSONObject("gb")?.optString("src")?.takeIf { it.isNotBlank() } ?: "Google Books"
                         }
                         Column(pad.padding(top = 18.dp)) {
                             if (text != null) {
@@ -223,10 +223,24 @@ internal fun LiburuBookDetails(
                                 )
                                 Description(book.url, text, Modifier.padding(top = 6.dp))
                             } else {
-                                Text(stringResource(R.string.liburu_bd_no_synopsis), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val comic = LiburuEnrich.isComic(original.book.url)
+                                Text(
+                                    if (fetching) "Buscando en internet…" else if (fetchFailed) "No lo he encontrado en internet." else if (comic) "Este cómic no trae sinopsis." else stringResource(R.string.liburu_bd_no_synopsis),
+                                    style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    androidx.compose.material3.OutlinedButton(onClick = refresh, enabled = !fetching) {
-                                        Text(stringResource(R.string.liburu_bd_find_synopsis), fontWeight = FontWeight.SemiBold)
+                                    // As legible as the link chips: ink on the page, a spinner while it looks.
+                                    androidx.compose.material3.OutlinedButton(
+                                        onClick = refresh, enabled = !fetching,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.onSurface,
+                                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        ),
+                                    ) {
+                                        if (fetching) androidx.compose.material3.CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        if (fetching) Spacer(Modifier.width(8.dp))
+                                        Text(if (comic) "Buscar datos del cómic" else stringResource(R.string.liburu_bd_find_synopsis), fontWeight = FontWeight.SemiBold)
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     TextButton(onClick = { editing = true }) {

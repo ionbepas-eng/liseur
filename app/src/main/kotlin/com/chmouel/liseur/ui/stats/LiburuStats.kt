@@ -164,6 +164,8 @@ fun LiburuStatsScreen(
         item(span = StaggeredGridItemSpan.FullLine) {
             Text("Estadísticas", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.statusBarsPadding().padding(top = 20.dp, bottom = 4.dp))
         }
+        item(span = StaggeredGridItemSpan.FullLine) { RecapChips(data, zone) }
+        item(span = StaggeredGridItemSpan.FullLine) { Achievements(data, zone) }
         // Year
         item {
             Card {
@@ -594,6 +596,11 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
             }
         }
     }
+    var adding by remember { mutableStateOf<LocalDate?>(null) }
+    androidx.compose.material3.OutlinedButton(onClick = { adding = LocalDate.now(zone) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        Text("＋ Agregar sesión", fontWeight = FontWeight.SemiBold)
+    }
+    adding?.let { d -> AddSessionDialog(data.books, d, zone) { adding = null } }
     dayOpen?.let { day ->
         val list = byDay[day].orEmpty().sortedBy { it.start }
         AlertDialog(
@@ -610,6 +617,287 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
                 }
             },
             confirmButton = { TextButton(onClick = { dayOpen = null }) { Text("Cerrar") } },
+            dismissButton = { TextButton(onClick = { adding = ym.atDay(day); dayOpen = null }) { Text("＋ Agregar sesión este día") } },
         )
     }
+}
+
+/** «Agregar sesión»: what was read away from the app (paper, another reader). */
+@Composable
+private fun AddSessionDialog(books: List<Book>, day: LocalDate, zone: ZoneId, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val choices = remember(books) {
+        books.sortedWith(compareByDescending<Book> { it.lastOpenedAt ?: 0L }.thenBy { it.title.lowercase() })
+    }
+    var book by remember { mutableStateOf(choices.firstOrNull()) }
+    var date by remember { mutableStateOf(day.toString()) }
+    var time by remember { mutableStateOf(java.time.LocalTime.now().withSecond(0).withNano(0).toString().take(5)) }
+    var minutes by remember { mutableStateOf("30") }
+    var open by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text("Agregar sesión") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Para lo que leíste fuera de la app (en papel, en otro lector…). Las sesiones dentro de la app se registran solas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box {
+                    androidx.compose.material3.OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(book?.title ?: "Libro", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    androidx.compose.material3.DropdownMenu(open, { open = false }) {
+                        choices.take(80).forEach { b -> androidx.compose.material3.DropdownMenuItem(text = { Text(b.title, maxLines = 1) }, onClick = { book = b; open = false }) }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(date, { date = it }, label = { Text("Día (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(time, { time = it }, label = { Text("Hora") }, singleLine = true, modifier = Modifier.weight(0.6f))
+                }
+                OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit) }, label = { Text("Minutos") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val b = book ?: return@TextButton
+                val min = minutes.toIntOrNull()?.takeIf { it > 0 } ?: return@TextButton
+                val start = runCatching { LocalDate.parse(date).atTime(java.time.LocalTime.parse(time)).atZone(zone).toInstant().toEpochMilli() }.getOrNull() ?: return@TextButton
+                val end = start + min * 60_000L
+                context.container.applicationScopeLaunch {
+                    context.container.database.readingSessionDao().insert(
+                        ReadingSession(bookUrl = b.url, startedAt = start, endedAt = end, lastCheckpointAt = end, durationMs = min * 60_000L),
+                    )
+                    context.container.driveStateSync.syncNow(force = true)
+                }
+                onDone()
+            }) { Text("Guardar sesión") }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text("Cancelar") } },
+    )
+}
+
+// --- Logros, as achieve.js counts them -----------------------------------------------------
+
+private class Achv(val id: String, val name: String, val glyph: String, val tiers: List<Int>, val desc: (Int) -> String)
+
+private val ACHIEVEMENTS = listOf(
+    Achv("books", "Lector", "📚", listOf(1, 10, 25, 50, 100)) { "Termina $it ${if (it == 1) "libro" else "libros"}" },
+    Achv("pages", "Pasapáginas", "📄", listOf(1000, 5000, 10000, 25000, 50000)) { "Lee ${fmtNum(it)} páginas" },
+    Achv("hours", "Horas de vuelo", "⏱", listOf(10, 50, 100, 250, 500)) { "Acumula $it horas de lectura" },
+    Achv("streak", "Constancia", "🔥", listOf(7, 30, 100, 365)) { "Lee $it días seguidos" },
+    Achv("hl", "Subrayador", "🖍", listOf(10, 100, 500)) { "Haz $it subrayados" },
+    Achv("classics", "Clásico", "🏛", listOf(1, 5, 15)) { "Termina $it de tu estantería Clásicos" },
+    Achv("series", "Sagas", "📚", listOf(3, 10, 25)) { "Termina $it libros que formen parte de una serie" },
+    Achv("rated", "Crítico", "⭐", listOf(10, 50)) { "Califica $it libros terminados" },
+    Achv("fan", "Fiel", "❤", listOf(3)) { "Termina 3 libros del mismo autor" },
+    Achv("owl", "Búho", "🌙", listOf(1)) { "Lee pasada la medianoche" },
+    Achv("lark", "Alondra", "☀", listOf(1)) { "Lee antes de las 7 de la mañana" },
+    Achv("marathon", "Maratón", "⏳", listOf(1)) { "Lee 2 horas en una sola sesión" },
+    Achv("brick", "Tocho", "⛰", listOf(1)) { "Termina un libro de más de 600 páginas" },
+    Achv("fast", "Rayo", "⚡", listOf(1)) { "Termina un libro en 3 días o menos" },
+    Achv("old", "Arqueólogo", "📜", listOf(1)) { "Termina un libro publicado antes de 1900" },
+    Achv("perfect", "Mes perfecto", "📅", listOf(1)) { "Lee todos los días de un mes" },
+)
+private val TIER_NAMES = listOf("Bronce", "Plata", "Oro", "Rubí", "Diamante")
+private val TIER_COLORS = listOf(Color(0xFFD98B5B), Color(0xFF9FB4C7), Color(0xFFE8B83A), Color(0xFFC8455F), Color(0xFF6C8FE0))
+
+@Composable
+private fun Achievements(data: StatsData, zone: ZoneId) {
+    val context = LocalContext.current
+    val highlights by remember { context.container.database.annotationDao().observeAllMarks() }.collectAsState(emptyList())
+    val values = remember(data, highlights.size) {
+        val fin = data.finishedAt.keys
+        val pagesByBook = HashMap<String, Double>()
+        data.sits.forEach { pagesByBook[it.key] = (pagesByBook[it.key] ?: 0.0) + data.sitPages(it) }
+        fin.forEach { pagesByBook[it] = maxOf(pagesByBook[it] ?: 0.0, data.pagesOf(it)) }
+        val days = data.sits.map { dayOf(it.start, zone) }.toSet()
+        val perMonth = days.groupBy { YearMonth.from(it) }
+        val now = YearMonth.now(zone)
+        val byAuthor = fin.mapNotNull { data.byKey[it]?.author }.groupingBy { it }.eachCount()
+        val hours = data.sits.map { Instant.ofEpochMilli(it.start).atZone(zone).hour }
+        val state = runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull()
+        val shelves = state?.optJSONObject("shelves")
+        val classic = shelves?.keys()?.asSequence()?.filter { Regex("cl[aá]sic", RegexOption.IGNORE_CASE).containsMatchIn(shelves.optJSONObject(it)?.optString("name").orEmpty()) }?.toSet().orEmpty()
+        mapOf(
+            "books" to fin.size.toDouble(),
+            "pages" to pagesByBook.values.sum(),
+            "hours" to data.sits.sumOf { it.seconds } / 3600,
+            "streak" to streaks(days, LocalDate.now(zone)).second.toDouble(),
+            "hl" to highlights.size.toDouble(),
+            "classics" to fin.count { k -> data.webBooks.optJSONObject(k)?.optJSONObject("meta")?.optJSONArray("shelves")?.let { a -> (0 until a.length()).any { a.optString(it) in classic } } == true }.toDouble(),
+            "series" to fin.count { data.series(it) != null }.toDouble(),
+            "rated" to fin.count { it in data.rating }.toDouble(),
+            "fan" to (byAuthor.values.maxOrNull() ?: 0).toDouble(),
+            "owl" to if (hours.any { it < 5 }) 1.0 else 0.0,
+            "lark" to if (hours.any { it in 5..6 }) 1.0 else 0.0,
+            "marathon" to if (data.sits.any { it.seconds >= 7200 }) 1.0 else 0.0,
+            "brick" to if (fin.any { data.pagesOf(it) >= 600 }) 1.0 else 0.0,
+            "fast" to if (fin.any { k -> data.startedAt[k]?.let { s -> data.finishedAt.getValue(k) - s <= 3 * 86_400_000L } == true }) 1.0 else 0.0,
+            "old" to if (fin.any { k -> data.year(k)?.let { it < 1900 } == true }) 1.0 else 0.0,
+            "perfect" to if (perMonth.any { (m, d) -> m != now && d.size >= m.lengthOfMonth() }) 1.0 else 0.0,
+        )
+    }
+    val earned = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
+    val total = ACHIEVEMENTS.sumOf { it.tiers.size }
+    var open by remember { mutableStateOf<Achv?>(null) }
+    Card("Logros", "$earned de $total") {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(ACHIEVEMENTS, key = { it.id }) { a ->
+                val v = values[a.id] ?: 0.0
+                val tier = a.tiers.count { v >= it }
+                val color = if (tier == 0) MaterialTheme.colorScheme.surfaceContainerHighest else if (a.tiers.size == 1) Gold else TIER_COLORS[tier - 1]
+                Column(Modifier.width(84.dp).clickable { open = a }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(64.dp).background(color, CircleShape), contentAlignment = Alignment.Center) {
+                        Text(a.glyph, fontSize = 28.sp, modifier = Modifier.then(if (tier == 0) Modifier.background(Color.Transparent) else Modifier), color = Color.Unspecified)
+                        if (tier == 0) Box(Modifier.size(64.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape))
+                    }
+                    Text(a.name, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
+                    Text(if (tier == 0) "Por conseguir" else if (a.tiers.size == 1) "Conseguido" else TIER_NAMES[tier - 1], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+    open?.let { a ->
+        val v = values[a.id] ?: 0.0
+        val tier = a.tiers.count { v >= it }
+        val next = a.tiers.getOrNull(tier)
+        AlertDialog(
+            onDismissRequest = { open = null },
+            title = { Text("${a.glyph}  ${a.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    a.tiers.forEachIndexed { i, t ->
+                        Text((if (v >= t) "✓ " else "○ ") + (if (a.tiers.size > 1) "${TIER_NAMES[i]}: " else "") + a.desc(t), color = if (v >= t) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    next?.let { Text("Llevas ${fmtNum(v)} de ${fmtNum(it)}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = null }) { Text("Cerrar") } },
+        )
+    }
+}
+
+// --- Resúmenes, as stories ------------------------------------------------------------------
+
+@Composable
+private fun RecapChips(data: StatsData, zone: ZoneId) {
+    val now = YearMonth.now(zone)
+    val chips = buildList {
+        add(Triple(now.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, "en curso", now as Any))
+        add(Triple("${now.year}", "tu año", now.year as Any))
+        (1..5).forEach { k -> val m = now.minusMonths(k.toLong()); add(Triple(m.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, "${m.year}", m as Any)) }
+    }
+    var open by remember { mutableStateOf<Any?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("Resúmenes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("Como historias, para ver y compartir", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(chips, key = { it.third.toString() }) { (t, sub, p) ->
+                Surface(onClick = { open = p }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                    Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                        Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+    open?.let { p -> RecapStory(data, zone, p) { open = null } }
+}
+
+private class Slide(val kicker: String, val big: String, val text: String, val books: List<Book> = emptyList())
+
+@Composable
+private fun RecapStory(data: StatsData, zone: ZoneId, period: Any, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val from: Long
+    val to: Long
+    val label: String
+    val what: String
+    if (period is YearMonth) {
+        val n = period.month.getDisplayName(TextStyle.FULL_STANDALONE, ES)
+        from = period.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        to = period.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        label = "${n.replaceFirstChar { it.uppercase() }} ${period.year}"; what = "Tu $n"
+    } else {
+        val y = period as Int
+        from = LocalDate.of(y, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+        to = LocalDate.of(y + 1, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
+        label = "$y"; what = "Tu $y"
+    }
+    val ses = data.sits.filter { it.start in from until to }
+    val minutes = ses.sumOf { it.seconds } / 60
+    val days = ses.map { dayOf(it.start, zone) }.toSet()
+    val fin = data.finishedAt.filter { it.value in from until to }.entries.sortedBy { it.value }.mapNotNull { data.byKey[it.key] }
+    val perBook = ses.groupBy { it.key }.mapValues { e -> e.value.sumOf { it.seconds } / 60 }.entries.sortedByDescending { it.value }
+    val hours = DoubleArray(24); ses.forEach { hours[Instant.ofEpochMilli(it.start).atZone(zone).hour] += it.seconds / 60 }
+    val peak = hours.indices.maxByOrNull { hours[it] } ?: 0
+    val topAuthor = (perBook.mapNotNull { e -> data.byKey[e.key]?.author?.let { it to e.value } } + fin.mapNotNull { b -> b.author?.let { it to 30.0 } })
+        .groupBy({ it.first }, { it.second }).mapValues { it.value.sum() }.maxByOrNull { it.value }?.key
+    val fav = fin.filter { data.rating[keyOfBook(it)] != null }.maxByOrNull { data.rating[keyOfBook(it)]!! } ?: perBook.firstOrNull()?.let { data.byKey[it.key] }
+    val slides = buildList {
+        add(Slide("Resumen de lectura", "$what en libros", "Desliza para ver más"))
+        if (minutes < 1 && fin.isEmpty()) add(Slide(label, "Aún sin lecturas", "Abre un libro y la app irá contando el tiempo sola."))
+        else {
+            add(Slide("Tiempo de lectura", fmtMin(minutes), "en ${days.size} ${if (days.size == 1) "día" else "días"} y ${ses.size} ${if (ses.size == 1) "sesión" else "sesiones"}"))
+            add(Slide("Libros terminados", "${fin.size}", if (fin.isEmpty()) "Ninguno terminado todavía" else fin.joinToString(", ") { it.title }.take(140), fin.take(6)))
+            perBook.take(3).mapNotNull { data.byKey[it.key] }.takeIf { it.isNotEmpty() }?.let { add(Slide("Lo que más leíste", it.first().title, it.first().author.orEmpty(), it)) }
+            if (minutes >= 5) add(Slide("Tu hora", when { peak in 5..11 -> "Alondra"; peak in 12..19 -> "Lector de tarde"; else -> "Búho" }, "Sueles leer entre las $peak y las ${(peak + 1) % 24} h"))
+            topAuthor?.let { add(Slide("Tu autor", it, "Quien más te ha acompañado")) }
+            fav?.let { add(Slide("Tu favorito", it.title, it.author.orEmpty(), listOf(it))) }
+        }
+    }
+    var index by remember { mutableIntStateOf(0) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        val s = slides[index]
+        Box(
+            Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, Color(0xFF1B1A17))))
+                .clickable { if (index < slides.size - 1) index++ else onClose() },
+        ) {
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                slides.indices.forEach { i -> Box(Modifier.weight(1f).height(3.dp).background(Color.White.copy(alpha = if (i <= index) 0.9f else 0.3f), RoundedCornerShape(2.dp))) }
+            }
+            Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(s.kicker.uppercase(ES), color = Color.White.copy(alpha = 0.8f), letterSpacing = 2.sp, style = MaterialTheme.typography.labelLarge)
+                Text(s.big, color = Color.White, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                Text(s.text, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                if (s.books.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    s.books.take(4).forEach { BookCover(it, Modifier.width(70.dp).aspectRatio(2f / 3f)) }
+                }
+            }
+            Row(Modifier.align(Alignment.BottomCenter).padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { shareSlide(context, label, s) }, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF1B1A17))) { Text("Compartir") }
+                Button(onClick = onClose, colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f), contentColor = Color.White)) { Text("Cerrar") }
+            }
+        }
+    }
+}
+
+private fun keyOfBook(b: Book) = keyOf(b.url)
+
+/** The slide as a 1080×1920 image in the reader's accent, for stories. */
+private fun shareSlide(context: Context, label: String, s: Slide) {
+    val w = 1080; val h = 1920
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(bmp)
+    val accent = com.chmouel.liseur.ui.theme.LiburuAppearance.accentColor(com.chmouel.liseur.ui.theme.LiburuAppearance.look.value)
+    val argb = android.graphics.Color.argb(255, (accent.red * 255).toInt(), (accent.green * 255).toInt(), (accent.blue * 255).toInt())
+    c.drawPaint(android.graphics.Paint().apply { shader = android.graphics.LinearGradient(0f, 0f, 0f, h.toFloat(), argb, 0xFF1B1A17.toInt(), android.graphics.Shader.TileMode.CLAMP) })
+    val serif = runCatching { android.graphics.Typeface.createFromAsset(context.assets, "fonts/Fraunces.ttf") }.getOrNull()
+    fun text(t: String, y: Float, size: Float, face: android.graphics.Typeface?, alpha: Int) {
+        val p = android.text.TextPaint().apply { isAntiAlias = true; color = android.graphics.Color.WHITE; this.alpha = alpha; textSize = size; typeface = face }
+        val layout = android.text.StaticLayout.Builder.obtain(t, 0, t.length, p, w - 160).setAlignment(android.text.Layout.Alignment.ALIGN_CENTER).build()
+        c.save(); c.translate(80f, y); layout.draw(c); c.restore()
+    }
+    text(s.kicker.uppercase(ES), 620f, 44f, null, 210)
+    text(s.big, 720f, 120f, serif, 255)
+    text(s.text, 1180f, 48f, null, 220)
+    text("Liburuville · $label", 1760f, 40f, null, 180)
+    val dir = File(context.cacheDir, "quotes").apply { mkdirs() }
+    val f = File(dir, "resumen.png")
+    f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".quotes", f)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("image/png")
+        .putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(android.content.Intent.createChooser(send, "Compartir resumen"))
 }

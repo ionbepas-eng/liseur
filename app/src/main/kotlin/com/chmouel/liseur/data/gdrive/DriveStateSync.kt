@@ -82,6 +82,94 @@ class DriveStateSync(
             .put("positions", exportPositions())
             .put("annotations", exportAnnotations())
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
+        runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
+    }
+
+    /**
+     * The web app's shared file (`state.json`): goals, appearance and profile
+     * (name and photo) are merged both ways, newest change winning, and every
+     * other part of the file is left exactly as the web wrote it.
+     */
+    private fun syncSharedProfile() {
+        val url = "${DriveAuth.BASE_URL}/files".toHttpUrl().newBuilder()
+            .addQueryParameter("spaces", "appDataFolder")
+            .addQueryParameter("q", "name='state.json' and trashed=false")
+            .addQueryParameter("fields", "files(id)")
+            .build()
+        val id = http.newCall(Request.Builder().url(url).build()).execute().use {
+            if (!it.isSuccessful) throw IOException("list state ${it.code}")
+            JSONObject(it.body.string()).optJSONArray("files")?.optJSONObject(0)?.optString("id")
+        }?.takeIf { it.isNotEmpty() }
+        val state = id?.let(::download)?.let { runCatching { JSONObject(it) }.getOrNull() }
+            ?: JSONObject().put("v", 1).put("books", JSONObject())
+        var changed = false
+        val prefs = com.chmouel.liseur.ui.library.styles.LiburuPrefs
+        val look = com.chmouel.liseur.ui.theme.LiburuAppearance
+
+        // Goals: { daily, yearly, t }
+        val goals = state.optJSONObject("goals")
+        if (goals != null && goals.optLong("t") > prefs.goalsChangedAt(app)) {
+            prefs.setDailyGoal(app, goals.optInt("daily", 30), goals.optLong("t"))
+            prefs.setYearGoal(app, goals.optInt("yearly", 24), goals.optLong("t"))
+        } else if (prefs.goalsChangedAt(app) > (goals?.optLong("t") ?: 0L)) {
+            state.put("goals", JSONObject().put("daily", prefs.dailyGoal(app)).put("yearly", prefs.yearGoal(app)).put("t", prefs.goalsChangedAt(app)))
+            changed = true
+        }
+
+        // Appearance: { bg, wall, accent, dim, titles, t } — the web's own extras kept.
+        look.init(app)
+        val appearance = state.optJSONObject("appearance")
+        if (appearance != null && appearance.optLong("t") > look.changedAt()) {
+            look.adopt(
+                appearance.optString("bg").takeIf { it.isNotEmpty() },
+                appearance.optString("wall").takeIf { it.isNotEmpty() && it != "null" },
+                appearance.optString("accent").takeIf { it.isNotEmpty() },
+                appearance.optLong("t"),
+            )
+        } else if (look.changedAt() > (appearance?.optLong("t") ?: 0L)) {
+            val now = look.look.value
+            state.put(
+                "appearance",
+                (appearance ?: JSONObject().put("dim", 0.25).put("titles", false))
+                    .put("bg", now.background ?: "crema")
+                    .put("wall", now.wallpaper ?: JSONObject.NULL)
+                    .put("accent", now.accent)
+                    .put("t", look.changedAt()),
+            )
+            changed = true
+        }
+
+        // Profile: { name, avatar (data URL), t }
+        val profile = state.optJSONObject("profile")
+        if (profile != null && profile.optLong("t") > prefs.profileChangedAt(app)) {
+            prefs.setName(app, profile.optString("name").takeIf { it.isNotBlank() }, profile.optLong("t"))
+            prefs.adoptAvatarDataUrl(app, profile.optString("avatar").takeIf { it.isNotBlank() })
+        } else if (prefs.profileChangedAt(app) > (profile?.optLong("t") ?: 0L)) {
+            state.put(
+                "profile",
+                JSONObject()
+                    .put("name", prefs.name(app).orEmpty())
+                    .put("avatar", prefs.avatarDataUrl(app).orEmpty())
+                    .put("t", prefs.profileChangedAt(app)),
+            )
+            changed = true
+        }
+
+        if (!changed) return
+        state.put("updated", System.currentTimeMillis())
+        val json = "application/json".toMediaType()
+        val request = if (id != null) {
+            Request.Builder().url("$UPLOAD/files/$id?uploadType=media").patch(state.toString().toRequestBody(json)).build()
+        } else {
+            val meta = JSONObject().put("name", "state.json").put("parents", JSONArray().put("appDataFolder"))
+            Request.Builder().url("$UPLOAD/files?uploadType=multipart").post(
+                MultipartBody.Builder().setType("multipart/related".toMediaType())
+                    .addPart(meta.toString().toRequestBody(json))
+                    .addPart(state.toString().toRequestBody(json))
+                    .build(),
+            ).build()
+        }
+        http.newCall(request).execute().use { if (!it.isSuccessful) throw IOException("state upload ${it.code}") }
     }
 
     private suspend fun apply(remote: JSONObject) {

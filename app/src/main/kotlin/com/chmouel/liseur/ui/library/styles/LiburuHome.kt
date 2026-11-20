@@ -34,6 +34,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -62,15 +65,46 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.flow.map
 
-/** Liburuville's goals, until they are shared with the web profile. */
+/** Liburuville's goals and profile, shared with the web app through Drive. */
 object LiburuPrefs {
     private fun prefs(context: Context) = context.getSharedPreferences("liburu", Context.MODE_PRIVATE)
     fun dailyGoal(context: Context) = prefs(context).getInt("dailyGoalMin", 30)
-    fun setDailyGoal(context: Context, minutes: Int) = prefs(context).edit().putInt("dailyGoalMin", minutes).apply()
+    fun setDailyGoal(context: Context, minutes: Int, at: Long = System.currentTimeMillis()) =
+        prefs(context).edit().putInt("dailyGoalMin", minutes).putLong("goalsT", at).apply()
     fun yearGoal(context: Context) = prefs(context).getInt("yearGoal", 24)
-    fun setYearGoal(context: Context, books: Int) = prefs(context).edit().putInt("yearGoal", books).apply()
+    fun setYearGoal(context: Context, books: Int, at: Long = System.currentTimeMillis()) =
+        prefs(context).edit().putInt("yearGoal", books).putLong("goalsT", at).apply()
+    fun goalsChangedAt(context: Context) = prefs(context).getLong("goalsT", 0L)
     fun name(context: Context) = prefs(context).getString("name", null)
-    fun setName(context: Context, name: String?) = prefs(context).edit().putString("name", name).apply()
+    fun setName(context: Context, name: String?, at: Long = System.currentTimeMillis()) =
+        prefs(context).edit().putString("name", name).putLong("profileT", at).apply()
+    fun profileChangedAt(context: Context) = prefs(context).getLong("profileT", 0L)
+    fun avatarFile(context: Context) = java.io.File(context.filesDir, "liburu-avatar.jpg")
+
+    /** Bumped whenever the photo changes, so Compose reloads it. */
+    val avatarVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    /** Square-crops and shrinks a picked photo to 320 px, as the web app does. */
+    fun setAvatar(context: Context, source: android.net.Uri) {
+        val bitmap = context.contentResolver.openInputStream(source)?.use(android.graphics.BitmapFactory::decodeStream) ?: return
+        val side = minOf(bitmap.width, bitmap.height)
+        val square = android.graphics.Bitmap.createBitmap(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side)
+        val small = android.graphics.Bitmap.createScaledBitmap(square, 320, 320, true)
+        avatarFile(context).outputStream().use { small.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, it) }
+        prefs(context).edit().putLong("profileT", System.currentTimeMillis()).apply()
+        avatarVersion.value++
+    }
+
+    fun avatarDataUrl(context: Context): String? = avatarFile(context).takeIf { it.exists() }?.readBytes()?.let {
+        "data:image/jpeg;base64," + android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+    }
+
+    fun adoptAvatarDataUrl(context: Context, dataUrl: String?) {
+        if (dataUrl.isNullOrBlank()) { avatarFile(context).delete(); avatarVersion.value++; return }
+        val bytes = runCatching { android.util.Base64.decode(dataUrl.substringAfter(","), android.util.Base64.DEFAULT) }.getOrNull() ?: return
+        avatarFile(context).writeBytes(bytes)
+        avatarVersion.value++
+    }
 }
 
 /** What the sessions say about this week and the run of days read. */
@@ -174,6 +208,8 @@ internal fun LiburuHome(
                     )
                 }
                 GoalRing(rhythm.minutesToday, goal, Modifier.size(64.dp))
+                Spacer(Modifier.width(12.dp))
+                Avatar(Modifier.size(64.dp))
             }
         }
         if (quote != null) {
@@ -410,3 +446,46 @@ private fun GoalsCard(
         }
     }
 }
+
+@Composable
+private fun Avatar(modifier: Modifier) {
+    val context = LocalContext.current
+    val version by LiburuPrefs.avatarVersion.collectAsState()
+    val image = remember(version) {
+        LiburuPrefs.avatarFile(context).takeIf { it.exists() }
+            ?.let { android.graphics.BitmapFactory.decodeFile(it.path)?.asImageBitmapCompat() }
+    }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) LiburuPrefs.setAvatar(context, uri) }
+    Box(
+        modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable {
+                pick.launch(
+                    androidx.activity.result.PickVisualMediaRequest(
+                        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                    ),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (image != null) {
+            androidx.compose.foundation.Image(
+                image,
+                contentDescription = stringResource(R.string.liburu_profile_photo),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.matchParentSizeCompat(),
+            )
+        } else {
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.Outlined.AddAPhoto,
+                contentDescription = stringResource(R.string.liburu_profile_photo),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun android.graphics.Bitmap.asImageBitmapCompat() = asImageBitmap()

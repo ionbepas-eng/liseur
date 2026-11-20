@@ -64,10 +64,25 @@ object LiburuAppearance {
     fun setWallpaper(key: String?) = update(_look.value.copy(wallpaper = key))
     fun wallpaper(look: LiburuLook): LiburuWallpaper? = wallpapers.firstOrNull { it.key == look.wallpaper }
 
-    private fun update(look: LiburuLook) {
+    private fun update(look: LiburuLook, at: Long = System.currentTimeMillis()) {
         _look.value = look
         prefs?.edit()?.putString("bg", look.background)?.putString("accent", look.accent)
-            ?.putString("wallpaper", look.wallpaper)?.apply()
+            ?.putString("wallpaper", look.wallpaper)?.putLong("appearanceT", at)?.apply()
+    }
+
+    /** When this device last changed the appearance, for merging with the web profile. */
+    fun changedAt(): Long = prefs?.getLong("appearanceT", 0L) ?: 0L
+
+    /** Takes a newer appearance from the shared profile (web keys: bg, wall, accent). */
+    fun adopt(bg: String?, wall: String?, accent: String?, at: Long) {
+        update(
+            LiburuLook(
+                background = bg?.takeIf { key -> backgrounds.any { it.first == key } },
+                accent = accent?.takeIf { key -> accents.any { it.first == key } } ?: "rosa",
+                wallpaper = wall?.takeIf { key -> wallpapers.any { it.key == key } },
+            ),
+            at,
+        )
     }
 
     fun backgroundColor(look: LiburuLook): Color? = backgrounds.firstOrNull { it.first == look.background }?.second

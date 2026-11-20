@@ -42,6 +42,7 @@ class DriveStateSync(
     private val positions: ReadingPositionBackupRepository,
     private val annotations: AnnotationBackupRepository,
     private val bookDao: com.chmouel.liseur.data.db.BookDao,
+    private val sessionDao: com.chmouel.liseur.data.db.ReadingSessionDao,
     private val http: OkHttpClient = DriveAuth.client(),
 ) {
     private val app = context.applicationContext
@@ -84,6 +85,7 @@ class DriveStateSync(
             .put("annotations", exportAnnotations())
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
+        runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
     }
 
     /**
@@ -158,6 +160,8 @@ class DriveStateSync(
 
         if (syncBooks(state)) changed = true
 
+        // Kept for the Home level and challenges, which read the web's books, shelves and retos.
+        File(app.filesDir, STATE_CACHE).writeText(state.toString())
         if (!changed) return
         state.put("updated", System.currentTimeMillis())
         val json = "application/json".toMediaType()
@@ -265,6 +269,71 @@ class DriveStateSync(
         return changed
     }
 
+    /**
+     * Reading sessions in the web app's own format, both ways: this device's
+     * Drive-book sittings go out as `sessions-android-<id>.json`, which the web
+     * reads like any other device's; everyone else's come back for the Home
+     * level, streak and challenges.
+     */
+    private suspend fun exportSessionsJson(): JSONObject {
+        val out = JSONArray()
+        for (s in sessionDao.allOnceForExport()) {
+            if (!s.bookUrl.startsWith(DRIVE_URL) || s.durationMs <= 0) continue
+            val end = s.endedAt ?: s.lastCheckpointAt
+            out.put(
+                JSONObject()
+                    .put("id", "and-$deviceId-${s.id}")
+                    .put("bookId", "g:" + s.bookUrl.removePrefix(DRIVE_URL))
+                    .put("device", "android-$deviceId")
+                    .put("deviceName", "Android")
+                    .put("start", s.startedAt)
+                    .put("end", end)
+                    .put("seconds", s.durationMs / 1000)
+                    .put("fromFrac", s.startProgression ?: JSONObject.NULL)
+                    .put("toFrac", s.endProgression ?: JSONObject.NULL),
+            )
+        }
+        return JSONObject().put("v", 1).put("device", "android-$deviceId").put("sessions", out)
+    }
+
+    private suspend fun exchangeSessions() {
+        val url = "${DriveAuth.BASE_URL}/files".toHttpUrl().newBuilder()
+            .addQueryParameter("spaces", "appDataFolder")
+            .addQueryParameter("q", "name contains 'sessions-' and trashed=false")
+            .addQueryParameter("fields", "files(id,name)")
+            .addQueryParameter("pageSize", "100")
+            .build()
+        val files = http.newCall(Request.Builder().url(url).build()).execute().use {
+            if (!it.isSuccessful) throw IOException("list sessions ${it.code}")
+            val arr = JSONObject(it.body.string()).optJSONArray("files") ?: JSONArray()
+            (0 until arr.length()).map { i -> arr.getJSONObject(i).let { f -> f.getString("id") to f.getString("name") } }
+        }
+        val mineName = "sessions-android-$deviceId.json"
+        val others = JSONArray()
+        for ((id, name) in files) {
+            if (name == mineName) continue
+            val text = download(id) ?: continue
+            val list = runCatching { JSONObject(text).optJSONArray("sessions") }.getOrNull() ?: continue
+            for (i in 0 until list.length()) others.put(list.get(i))
+        }
+        File(app.filesDir, SESSIONS_CACHE).writeText(others.toString())
+        val body = exportSessionsJson().toString()
+        val existing = files.firstOrNull { it.second == mineName }?.first
+        val json = "application/json".toMediaType()
+        val request = if (existing != null) {
+            Request.Builder().url("$UPLOAD/files/$existing?uploadType=media").patch(body.toRequestBody(json)).build()
+        } else {
+            val meta = JSONObject().put("name", mineName).put("parents", JSONArray().put("appDataFolder"))
+            Request.Builder().url("$UPLOAD/files?uploadType=multipart").post(
+                MultipartBody.Builder().setType("multipart/related".toMediaType())
+                    .addPart(meta.toString().toRequestBody(json))
+                    .addPart(body.toRequestBody(json))
+                    .build(),
+            ).build()
+        }
+        http.newCall(request).execute().use { if (!it.isSuccessful) throw IOException("sessions upload ${it.code}") }
+    }
+
     private suspend fun exportPositions(): String {
         val file = File.createTempFile("positions", ".json", app.cacheDir)
         try {
@@ -332,5 +401,7 @@ class DriveStateSync(
         private val DRIVE_URL = "${ServerKind.DRIVE.urlPrefix}:"
         private const val MAX_BYTES = 20L * 1024 * 1024
         private const val MIN_INTERVAL = 45_000L
+        const val STATE_CACHE = "liburu-state.json"
+        const val SESSIONS_CACHE = "liburu-web-sessions.json"
     }
 }

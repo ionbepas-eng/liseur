@@ -155,6 +155,10 @@ interface ReadingSessionDao {
     @Query("SELECT * FROM reading_sessions WHERE id = :id")
     suspend fun get(id: Long): ReadingSession?
 
+    /** Every session, for Liburuville's sessions file shared with the web app. */
+    @Query("SELECT * FROM reading_sessions ORDER BY started_at")
+    suspend fun allOnceForExport(): List<ReadingSession>
+
     /** Every session anywhere, newest first. The dashboard's whole input. */
     @Query("SELECT * FROM reading_sessions ORDER BY started_at DESC")
     fun observeAll(): Flow<List<ReadingSession>>

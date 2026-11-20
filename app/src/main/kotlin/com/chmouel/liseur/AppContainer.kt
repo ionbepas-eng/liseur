@@ -1041,6 +1041,7 @@ class AppContainer(
             ),
             annotations = annotationBackup,
             bookDao = database.bookDao(),
+            sessionDao = database.readingSessionDao(),
         )
     }
 

@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -165,6 +166,12 @@ internal fun LiburuHome(
         container.database.readingSessionDao().observeAll().map { rhythmOf(it, LocalDate.now(zone), zone) }
     }
     val rhythm by rhythmFlow.collectAsState(initial = Rhythm(0, List(7) { false }, 0, 0))
+    val allSessions by remember { container.database.readingSessionDao().observeAll() }.collectAsState(initial = emptyList())
+    val progress by androidx.compose.runtime.produceState<LiburuProgress.Summary?>(null, allSessions, state.books) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { LiburuProgress.compute(context, allSessions, state.books, zone) }.getOrNull()
+        }
+    }
     val goal = LiburuPrefs.dailyGoal(context)
     val name by androidx.compose.runtime.produceState(LiburuPrefs.name(context)) {
         if (value == null) {
@@ -265,6 +272,20 @@ internal fun LiburuHome(
                 onContinue = onBookSelected,
                 modifier = gutter.fillMaxWidth(),
             )
+        }
+        progress?.let { p ->
+            item(key = "lh:level") { LevelCard(p.level, gutter.fillMaxWidth()) }
+            if (p.retos.isNotEmpty()) {
+                item(key = "lh:retos") {
+                    Column(gutter, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Retos de ${p.monthName}",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                        )
+                        p.retos.forEach { RetoCard(it) }
+                    }
+                }
+            }
         }
         if (readThisYear.isNotEmpty()) {
             item(key = "lh:year") {
@@ -489,3 +510,76 @@ private fun Avatar(modifier: Modifier) {
 }
 
 private fun android.graphics.Bitmap.asImageBitmapCompat() = asImageBitmap()
+
+@Composable
+private fun LevelCard(level: LiburuProgress.Level, modifier: Modifier) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(28.dp), modifier = modifier) {
+        Row(Modifier.padding(22.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(92.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "NIVEL",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) Color(0xFF1B1A17) else Color(0xFFF3EEE6),
+                    )
+                    Text(
+                        "${level.n}",
+                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) Color(0xFF1B1A17) else Color(0xFFF3EEE6),
+                    )
+                }
+            }
+            Spacer(Modifier.width(18.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(level.name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                ProgressBar(level.pct, MaterialTheme.colorScheme.primary)
+                Text(
+                    if (level.to != null) "${level.xp} / ${level.to} puntos · siguiente: ${level.nextName}" else "${level.xp} puntos · nivel máximo",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RetoCard(reto: LiburuProgress.Reto) {
+    val done = reto.done
+    val green = Color(0xFF5B9A55)
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(reto.title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                if (done) {
+                    Box(Modifier.size(30.dp).background(green, CircleShape), contentAlignment = Alignment.Center) {
+                        Text("✓", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                    }
+                } else {
+                    Text(
+                        "${reto.value.toInt().coerceAtMost(reto.target.toInt())} / ${reto.target.toInt()}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            ProgressBar((reto.value / reto.target).toFloat(), if (done) green else MaterialTheme.colorScheme.primary)
+            Text(
+                (if (reto.auto) "Reto del mes" else "Tu reto") + " · " +
+                    if (done) "¡Conseguido!" else if (reto.daysLeft == 1) "queda 1 día" else "quedan ${reto.daysLeft} días",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressBar(pct: Float, color: Color) {
+    Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+        Box(Modifier.fillMaxWidth(pct.coerceIn(0f, 1f)).height(10.dp).clip(RoundedCornerShape(5.dp)).background(color))
+    }
+}

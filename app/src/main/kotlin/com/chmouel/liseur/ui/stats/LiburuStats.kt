@@ -45,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -551,13 +552,25 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
     val byDay = ms.groupBy { dayOf(it.start, zone).dayOfMonth }
     var dayOpen by remember { mutableStateOf<Int?>(null) }
     Card {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RoundArrow("‹") { onMonth(ym.minusMonths(1)) }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(ym.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-                Text("${ym.year}", style = MaterialTheme.typography.titleLarge)
+        // The web's drawing of the month, with its name over it.
+        val ctx = LocalContext.current
+        val ink = MONTH_INK[ym.monthValue - 1]
+        Box(Modifier.fillMaxWidth().height(170.dp).padding(horizontal = 0.dp).background(Color.Transparent, RoundedCornerShape(16.dp))) {
+            coil3.compose.AsyncImage(
+                model = remember(ym.monthValue) {
+                    coil3.request.ImageRequest.Builder(ctx).data("file:///android_asset/months/m${ym.monthValue - 1}.svg")
+                        .decoderFactory(coil3.svg.SvgDecoder.Factory()).build()
+                },
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().androidxClip(),
+            )
+            Column(Modifier.align(Alignment.TopCenter).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(ym.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = ink)
+                Text("${ym.year}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = ink)
             }
-            RoundArrow("›", enabled = ym < now) { onMonth(ym.plusMonths(1)) }
+            Box(Modifier.align(Alignment.TopStart).padding(10.dp)) { RoundArrow("‹") { onMonth(ym.minusMonths(1)) } }
+            Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) { RoundArrow("›", enabled = ym < now) { onMonth(ym.plusMonths(1)) } }
         }
         Tiles(listOf("$done" to "libros", fmtNum(pages) to "páginas", "${if (elapsed > 0) (pages / elapsed).toInt() else 0}" to "páginas/día"))
         Row(Modifier.fillMaxWidth()) {
@@ -915,3 +928,8 @@ private fun shareSlide(context: Context, label: String, s: Slide) {
         .putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(android.content.Intent.createChooser(send, "Compartir resumen"))
 }
+
+private val MONTH_INK = listOf("#fff", "#fff", "#21412b", "#4a1420", "#3b2a05", "#06324a", "#fff", "#fff", "#3a1430", "#fff", "#fff", "#fff")
+    .map { Color(android.graphics.Color.parseColor(if (it.length == 4) "#" + it.drop(1).map { c -> "$c$c" }.joinToString("") else it)) }
+
+private fun Modifier.androidxClip() = this.then(Modifier.clip(RoundedCornerShape(16.dp)))

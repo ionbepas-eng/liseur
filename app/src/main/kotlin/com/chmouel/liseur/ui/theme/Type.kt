@@ -45,39 +45,33 @@ fun interFamily(assets: AssetManager): FontFamily {
     return FontFamily(cut(400), cut(500), cut(600), cut(700))
 }
 
+/**
+ * Sizes as the web sets them (body 15px, small 13px, page titles 34px,
+ * card titles 26px…), with no extra tracking: Android's defaults are a size
+ * larger and spaced out, and a phone screen showed half what the web did.
+ */
 fun liseurTypography(serif: FontFamily, sans: FontFamily? = null): Typography = Typography().run {
-    val t = if (sans == null) this else copy(
-        bodyLarge = bodyLarge.copy(fontFamily = sans),
-        bodyMedium = bodyMedium.copy(fontFamily = sans),
-        bodySmall = bodySmall.copy(fontFamily = sans),
-        labelLarge = labelLarge.copy(fontFamily = sans),
-        labelMedium = labelMedium.copy(fontFamily = sans),
-        labelSmall = labelSmall.copy(fontFamily = sans),
-        titleMedium = titleMedium.copy(fontFamily = sans),
-        titleSmall = titleSmall.copy(fontFamily = sans),
-    )
-    t.copy(
-        displayLarge = displayLarge.copy(fontFamily = serif),
-        displayMedium = displayMedium.copy(fontFamily = serif),
-        displaySmall = displaySmall.copy(fontFamily = serif),
-        headlineLarge = headlineLarge.copy(fontFamily = serif),
-        headlineMedium = headlineMedium.copy(fontFamily = serif),
-        headlineSmall = headlineSmall.copy(fontFamily = serif),
-        titleLarge = titleLarge.copy(
-            fontFamily = serif,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 24.sp,
-        ),
-        titleMedium = titleMedium.copy(
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-            lineHeight = 22.sp,
-        ),
-        titleSmall = titleSmall.copy(
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            lineHeight = 18.sp,
-        ),
+    val s = sans ?: FontFamily.Default
+    fun sansStyle(base: androidx.compose.ui.text.TextStyle, size: Int, line: Int, w: FontWeight = FontWeight.Normal) =
+        base.copy(fontFamily = s, fontSize = size.sp, lineHeight = line.sp, letterSpacing = 0.sp, fontWeight = w)
+    fun serifStyle(base: androidx.compose.ui.text.TextStyle, size: Int, line: Int, track: Double, w: FontWeight = FontWeight.SemiBold) =
+        base.copy(fontFamily = serif, fontSize = size.sp, lineHeight = line.sp, letterSpacing = track.sp, fontWeight = w)
+    copy(
+        displayLarge = serifStyle(displayLarge, 46, 50, -1.2),
+        displayMedium = serifStyle(displayMedium, 40, 44, -1.2),
+        displaySmall = serifStyle(displaySmall, 32, 36, -1.0),
+        headlineLarge = serifStyle(headlineLarge, 30, 34, -0.8),
+        headlineMedium = serifStyle(headlineMedium, 25, 30, -0.6),
+        headlineSmall = serifStyle(headlineSmall, 21, 26, -0.4),
+        titleLarge = serifStyle(titleLarge, 19, 24, -0.2),
+        titleMedium = sansStyle(titleMedium, 15, 20, FontWeight.SemiBold),
+        titleSmall = sansStyle(titleSmall, 13, 18, FontWeight.SemiBold),
+        bodyLarge = sansStyle(bodyLarge, 15, 22),
+        bodyMedium = sansStyle(bodyMedium, 14, 20),
+        bodySmall = sansStyle(bodySmall, 13, 18),
+        labelLarge = sansStyle(labelLarge, 14, 18, FontWeight.Medium),
+        labelMedium = sansStyle(labelMedium, 12, 16, FontWeight.Medium),
+        labelSmall = sansStyle(labelSmall, 11, 14, FontWeight.Medium),
     )
 }
 

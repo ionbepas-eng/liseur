@@ -1262,10 +1262,10 @@ private fun LevelCard(values: Map<String, Double>, page: Boolean = false) {
     Card {
         if (!page) Text("Tu nivel", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(104.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(84.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("NIVEL", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp, color = Paper.copy(alpha = 0.8f))
-                    Text("${li + 1}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = Paper)
+                    Text("${li + 1}", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = Paper)
                 }
             }
             Column(Modifier.padding(start = 20.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {

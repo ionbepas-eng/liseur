@@ -2362,7 +2362,7 @@
     <string name="liburu_wf_help">In the address, {t} is the title, {a} the author, {q} both and {isbn} the ISBN.</string>
     <string name="liburu_wf_add_btn">Add</string>
     <string name="liburu_se_hide_singles">Hide one-book series (%1$d)</string>
-    <string name="liburu_se_hint">To join, rename or undo a series, tap the pencil on its card.</string>
+    <string name="liburu_se_hint">To join, rename or undo a series, open it and tap «Edit».</string>
     <string name="liburu_se_read">%1$s · %2$d read</string>
     <string name="liburu_se_edit_title">Edit series</string>
     <string name="liburu_se_edit_explain">Rename it, or type the name of another series to join them. Undo puts back the series each book came with.</string>
@@ -2371,4 +2371,6 @@
     <string name="liburu_bd_on_device">Downloaded on this device</string>
     <string name="liburu_bd_not_on_device">Not downloaded on this device</string>
     <string name="liburu_bd_download">Download</string>
+    <string name="liburu_bd_barcode">Barcode</string>
+    <string name="liburu_bd_queued">Queued to download (waiting for Drive)</string>
 </resources>

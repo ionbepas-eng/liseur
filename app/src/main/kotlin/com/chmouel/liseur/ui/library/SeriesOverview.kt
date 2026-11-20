@@ -371,7 +371,7 @@ private fun LiburuSeriesGrid(
                         Text(
                             stringResource(R.string.liburu_se_hide_singles, singles),
                             color = if (hideSingles) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
                 }

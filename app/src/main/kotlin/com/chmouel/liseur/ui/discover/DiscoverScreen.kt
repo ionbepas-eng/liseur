@@ -419,7 +419,7 @@ private fun ExtSheet(e: LiburuDiscoverNet.Ext, onDone: () -> Unit) {
         },
         dismissButton = {
             if (e.link.isNotEmpty()) androidx.compose.material3.TextButton(onClick = {
-                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(e.link))) }
+                com.chmouel.liseur.ui.library.openUrl(context, e.link)
             }) { Text("Ver en Google Books") }
         },
     )

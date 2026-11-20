@@ -2288,7 +2288,7 @@
     <string name="liburu_wf_help">En la dirección, {t} es el título, {a} el autor, {q} ambos y {isbn} el ISBN.</string>
     <string name="liburu_wf_add_btn">Añadir</string>
     <string name="liburu_se_hide_singles">Ocultar series de 1 libro (%1$d)</string>
-    <string name="liburu_se_hint">Para unir, renombrar o deshacer una serie, pulsa el lápiz de su tarjeta.</string>
+    <string name="liburu_se_hint">Para unir, renombrar o deshacer una serie, ábrela y pulsa «Editar».</string>
     <string name="liburu_se_read">%1$s · %2$d leído</string>
     <string name="liburu_se_edit_title">Editar serie</string>
     <string name="liburu_se_edit_explain">Renómbrala o escribe el nombre de otra serie para unirlas. Deshacer devuelve a cada libro la serie con la que venía.</string>
@@ -2297,4 +2297,6 @@
     <string name="liburu_bd_on_device">Descargado en este dispositivo</string>
     <string name="liburu_bd_not_on_device">No descargado en este dispositivo</string>
     <string name="liburu_bd_download">Descargar</string>
+    <string name="liburu_bd_barcode">Código de barras</string>
+    <string name="liburu_bd_queued">En cola para descargar (esperando conexión con Drive)</string>
 </resources>

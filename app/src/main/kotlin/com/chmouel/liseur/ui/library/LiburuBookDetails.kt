@@ -801,7 +801,11 @@ private fun Biblio(details: BookDetails, net: JSONObject?, modifier: Modifier) {
         details.book.author?.takeIf { it.isNotBlank() }?.let { R.string.liburu_ed_author to it },
         m.published?.let { R.string.book_details_published to publishedShort(it, locale) },
         m.publishers.takeIf { it.isNotEmpty() }?.let { R.string.book_details_publisher to it.joinToString(", ") },
-        m.identifiers.firstOrNull { it.scheme == "isbn" }?.let { R.string.liburu_bd_isbn to it.value },
+        m.identifiers.firstOrNull { it.scheme == "isbn" }?.let {
+            // A comic's magazine barcode (977…, with its add-on) is not an ISBN; say what it is.
+            val d = it.value.filter(Char::isDigit)
+            if (d.startsWith("978") || d.startsWith("979") || d.length == 10) R.string.liburu_bd_isbn to it.value else R.string.liburu_bd_barcode to it.value
+        },
         m.pageCount?.let { R.string.book_details_pages to it.toString() },
         m.languages.firstOrNull()?.let { R.string.book_details_language to languageName(it, locale) },
         (cats.ifEmpty { m.subjects }).takeIf { it.isNotEmpty() }?.let { R.string.liburu_bd_genres to it.joinToString(", ") },
@@ -968,8 +972,19 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
     }
 }
 
-private fun openUrl(context: android.content.Context, url: String) {
-    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+/**
+ * Opens the platform's own app when one is installed and takes the link
+ * (Goodreads, Spotify, Amazon, Kobo…), the browser otherwise. Android 12+
+ * sends unverified links to the browser unless asked for a non-browser app.
+ */
+internal fun openUrl(context: android.content.Context, url: String) {
+    val uri = android.net.Uri.parse(url)
+    val view = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (android.os.Build.VERSION.SDK_INT >= 30) {
+        val app = android.content.Intent(view).addFlags(android.content.Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER)
+        if (runCatching { context.startActivity(app) }.isSuccess) return
+    }
+    runCatching { context.startActivity(view) }
 }
 
 /** «Otros libros de …», with what the library already holds marked. */
@@ -1188,6 +1203,7 @@ private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: D
             Text(
                 stringResource(
                     when {
+                        book.downloadState == DownloadState.QUEUED && download == null -> R.string.liburu_bd_queued
                         busy -> R.string.download_in_progress
                         onDevice -> R.string.liburu_bd_on_device
                         else -> R.string.liburu_bd_not_on_device
@@ -1197,6 +1213,9 @@ private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: D
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
+            if (!onDevice && book.downloadState == DownloadState.QUEUED && download == null && canDownload) {
+                TextButton(onClick = onDownload) { Text("Reintentar", fontWeight = FontWeight.SemiBold) }
+            }
             if (!onDevice && !busy && canDownload && book.downloadHref != null) {
                 TextButton(onClick = onDownload) { Text(stringResource(R.string.liburu_bd_download), fontWeight = FontWeight.SemiBold) }
             }

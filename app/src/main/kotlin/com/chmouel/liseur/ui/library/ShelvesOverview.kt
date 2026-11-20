@@ -48,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clipToBounds
 import com.chmouel.liseur.data.db.Book
 import com.chmouel.liseur.container
@@ -229,12 +231,14 @@ internal fun ShelvesOverview(
 internal fun FanCard(books: List<Book>, title: String, subtitle: String, onClick: () -> Unit, onEdit: (() -> Unit)? = null) {
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // As on the web: a translucent card on the page, the covers on near-white.
+        color = Color.White.copy(alpha = 0.42f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Column {
             androidx.compose.foundation.layout.BoxWithConstraints(
-                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)).clipToBounds(),
+                Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.72f)).clipToBounds(),
                 contentAlignment = Alignment.Center,
             ) {
                 val w = maxWidth
@@ -263,8 +267,8 @@ internal fun FanCard(books: List<Book>, title: String, subtitle: String, onClick
             }
             Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = MaterialTheme.typography.bodyLarge.fontFamily), fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(title, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 22.sp), fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                 }
                 onEdit?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Edit, androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_wf_edit)) } }
             }

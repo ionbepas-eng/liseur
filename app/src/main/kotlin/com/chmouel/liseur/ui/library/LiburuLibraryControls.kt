@@ -82,9 +82,9 @@ internal fun LiburuControls(
                 shape = RoundedCornerShape(22.dp),
                 color = field,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 46.dp),
             ) {
-                Box(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
                     Text(stringResource(R.string.liburu_lib_search), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }
@@ -96,9 +96,9 @@ internal fun LiburuControls(
                     shape = RoundedCornerShape(22.dp),
                     color = field,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.heightIn(min = 56.dp),
+                    modifier = Modifier.heightIn(min = 46.dp),
                 ) {
-                    Row(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(state.sort.label(), maxLines = 1)
                         Spacer(Modifier.width(8.dp))
                         Icon(Icons.Outlined.ExpandMore, null, Modifier.size(20.dp))
@@ -126,9 +126,8 @@ internal fun LiburuControls(
                 R.string.liburu_st_reading to setOf(LibraryFilterOption.IN_PROGRESS),
                 R.string.liburu_lib_to_read to setOf(LibraryFilterOption.UNREAD),
                 R.string.liburu_lib_finished to setOf(LibraryFilterOption.FINISHED),
-                R.string.liburu_st_want to setOf(LibraryFilterOption.WANT_TO_READ),
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 chips.forEach { (label, options) ->
                     val on = reading == options || (options == ALL_READING_STATES && reading.isEmpty())
                     Pill(stringResource(label), on, ink, paper) {
@@ -145,17 +144,13 @@ internal fun LiburuControls(
             val total = state.quickCounts.all
             val shown = state.books.size
             Text(
-                if (total > shown && total > 0) stringResource(R.string.liburu_lib_count_of, shown, total) else stringResource(R.string.liburu_lib_count, shown),
+                if (total > shown && total > 0) stringResource(R.string.liburu_lib_count_of, shown, total) else if (shown == 1) "1 libro" else stringResource(R.string.liburu_lib_count, shown),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
             extra?.invoke()
-            onChooseStyle?.let { choose ->
-                androidx.compose.material3.IconButton(onClick = choose) {
-                    Icon(Icons.Outlined.Dashboard, stringResource(R.string.library_style), Modifier.size(20.dp))
-                }
-            }
+
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinePill(stringResource(R.string.liburu_lib_refresh), Icons.Outlined.Refresh, actions.onRefresh)
@@ -185,7 +180,7 @@ private fun Pill(text: String, on: Boolean, ink: Color, paper: Color, onClick: (
             text,
             style = MaterialTheme.typography.bodyLarge,
             color = if (on) paper else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
     }
 }
@@ -198,7 +193,7 @@ private fun OutlinePill(text: String, icon: androidx.compose.ui.graphics.vector.
         color = Color.Transparent,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Row(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)

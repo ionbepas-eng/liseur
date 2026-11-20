@@ -338,6 +338,11 @@ fun LiseurTheme(
         LiburuAppearance.init(context)
         LiburuAppearance.look.collectAsState().value.let(LiburuAppearance::wallpaper)
     } else null
+    // Outside the reader, text follows the web's sizes: a large system font
+    // setting scales it a little (up to 15 %) rather than all the way.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val chromeDensity = if (readingPage == null && density.fontScale > 1.15f) androidx.compose.ui.unit.Density(density.density, 1.15f) else density
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides chromeDensity) {
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
@@ -351,5 +356,6 @@ fun LiseurTheme(
                     .background(androidx.compose.ui.graphics.Brush.verticalGradient(wall.colors)),
             ) { content() }
         }
+    }
     }
 }

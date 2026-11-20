@@ -166,6 +166,17 @@ class ReaderActivity : FragmentActivity() {
             return
         }
 
+        // Liburuville: a CBZ goes to the comic reader instead.
+        if (fromLibrary != null && com.chmouel.liseur.comic.ComicArchive.isComic(this, incoming)) {
+            startActivity(
+                com.chmouel.liseur.comic.ComicReaderActivity.intent(
+                    this, fromLibrary, intent.getStringExtra(EXTRA_ID) ?: url.toString(),
+                ),
+            )
+            finish()
+            return
+        }
+
         if (fromLibrary != null) {
             target = OpenTarget(
                 url,

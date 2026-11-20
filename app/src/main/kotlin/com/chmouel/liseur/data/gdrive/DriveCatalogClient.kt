@@ -53,7 +53,7 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
                         if (!name.equals("Audiolibros", ignoreCase = true)) queue += f.getString("id")
                         continue
                     }
-                    if (!name.lowercase().endsWith(".epub")) continue
+                    if (!name.lowercase().let { it.endsWith(".epub") || it.endsWith(".cbz") }) continue
                     books += book(f)
                 }
                 if (books.isNotEmpty()) onPage(books)

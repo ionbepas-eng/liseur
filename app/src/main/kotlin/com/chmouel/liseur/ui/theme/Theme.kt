@@ -333,7 +333,7 @@ fun LiseurTheme(
         schemeFor(dark = darkTheme, eInk = palette, dynamicColor = dynamicColor)
     }
 
-    val typography = remember { liseurTypography(frauncesFamily(context.assets)) }
+    val typography = remember { liseurTypography(frauncesFamily(context.assets), interFamily(context.assets)) }
     val wall = if (readingPage == null && palette == EInkPalette.NONE) {
         LiburuAppearance.init(context)
         LiburuAppearance.look.collectAsState().value.let(LiburuAppearance::wallpaper)

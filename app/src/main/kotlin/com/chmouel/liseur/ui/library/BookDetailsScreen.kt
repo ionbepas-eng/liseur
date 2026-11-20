@@ -122,6 +122,9 @@ fun BookDetailsScreen(
     onChooseFormat: (DownloadFormat) -> Unit = {},
     onSetReadingChoice: (ReadingStatusChoice) -> Unit = {},
     onSetEvaluation: (String, String?) -> Unit = { _, _ -> },
+    onSetSeries: (String?, Double?) -> Unit = { _, _ -> },
+    onResetSeries: () -> Unit = {},
+    onHide: () -> Unit = {},
 ) {
     if (state is BookDetailsUiState.Gone) {
         LaunchedEffect(Unit) { onBack() }
@@ -129,7 +132,7 @@ fun BookDetailsScreen(
     val details = (state as? BookDetailsUiState.Ready)?.details
     // Liburuville: the web's book page, except on e-ink.
     if (details != null && !LocalEInk.current) {
-        LiburuBookDetails(details, etaSeconds, canDownload, download, onBack, onRead, onDownload, onOpenStats, onSetReadingChoice, onSetEvaluation)
+        LiburuBookDetails(details, etaSeconds, canDownload, download, onBack, onRead, onDownload, onOpenStats, onSetReadingChoice, onSetEvaluation, onSetSeries, onResetSeries, onHide)
         return
     }
     Scaffold(

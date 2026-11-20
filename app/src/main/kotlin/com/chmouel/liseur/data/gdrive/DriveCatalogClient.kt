@@ -106,7 +106,7 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
             title = title,
             author = author,
             coverHref = f.optString("thumbnailLink").takeIf { it.isNotEmpty() }
-                ?.replace(Regex("=s\\d+$"), "=s600"),
+                ?.replace(Regex("=s\\d+$"), "=s600") ?: LiburuCovers.cached(id),
             downloadHref = "${DriveAuth.BASE_URL}/files/$id?alt=media",
             sizeBytes = f.optString("size").toLongOrNull(),
             updatedAt = f.optString("modifiedTime").takeIf { it.isNotEmpty() }

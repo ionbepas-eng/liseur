@@ -64,6 +64,7 @@ object LiburuEdits {
             publishers = g("publisher")?.let { listOf(it) } ?: m0.publishers,
             published = g("publishedDate") ?: m0.published,
             pageCount = gb?.optInt("pageCount")?.takeIf { it > 0 } ?: m0.pageCount,
+            description = m0.description ?: g("desc"),
             identifiers = if (m0.identifiers.none { it.scheme == "isbn" } && g("isbn13") != null) {
                 listOf(Identifier("isbn", g("isbn13")!!)) + m0.identifiers
             } else m0.identifiers,

@@ -42,6 +42,7 @@ class LiseurApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         com.chmouel.liseur.data.gdrive.DriveAuth.init(this)
         com.chmouel.liseur.ui.library.LiburuComics.init(this)
+        com.chmouel.liseur.data.gdrive.LiburuCovers.init(this)
         AppLocales.adoptLegacyChoice(this)
         AppLocales.applyProcessDefault(this)
         container = AppContainer(this)

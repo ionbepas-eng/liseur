@@ -36,8 +36,27 @@ fun frauncesFamily(assets: AssetManager): FontFamily {
     return FontFamily(cut(400), cut(500), cut(600), cut(700))
 }
 
-fun liseurTypography(serif: FontFamily): Typography = Typography().run {
-    copy(
+/** Inter, the web's text face, from one variable file. */
+fun interFamily(assets: AssetManager): FontFamily {
+    fun cut(w: Int) = Font(
+        "fonts/Inter.ttf", assets, FontWeight(w),
+        variationSettings = FontVariation.Settings(FontVariation.weight(w)),
+    )
+    return FontFamily(cut(400), cut(500), cut(600), cut(700))
+}
+
+fun liseurTypography(serif: FontFamily, sans: FontFamily? = null): Typography = Typography().run {
+    val t = if (sans == null) this else copy(
+        bodyLarge = bodyLarge.copy(fontFamily = sans),
+        bodyMedium = bodyMedium.copy(fontFamily = sans),
+        bodySmall = bodySmall.copy(fontFamily = sans),
+        labelLarge = labelLarge.copy(fontFamily = sans),
+        labelMedium = labelMedium.copy(fontFamily = sans),
+        labelSmall = labelSmall.copy(fontFamily = sans),
+        titleMedium = titleMedium.copy(fontFamily = sans),
+        titleSmall = titleSmall.copy(fontFamily = sans),
+    )
+    t.copy(
         displayLarge = displayLarge.copy(fontFamily = serif),
         displayMedium = displayMedium.copy(fontFamily = serif),
         displaySmall = displaySmall.copy(fontFamily = serif),

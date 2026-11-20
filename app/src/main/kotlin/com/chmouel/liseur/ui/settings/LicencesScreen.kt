@@ -84,6 +84,12 @@ private val Components = listOf(
         licenceAsset = "licences/fraunces.txt",
     ),
     Component(
+        name = "Inter",
+        licence = "SIL Open Font License 1.1",
+        notice = "Copyright 2016 The Inter Project Authors",
+        licenceAsset = "licences/inter.txt",
+    ),
+    Component(
         name = "Literata",
         licence = "SIL Open Font License 1.1",
         notice = "Copyright 2017 The Literata Project Authors",

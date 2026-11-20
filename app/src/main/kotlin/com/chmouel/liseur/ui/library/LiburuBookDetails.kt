@@ -125,6 +125,9 @@ internal fun LiburuBookDetails(
     onOpenStats: () -> Unit,
     onSetReadingChoice: (ReadingStatusChoice) -> Unit,
     onSetEvaluation: (String, String?) -> Unit,
+    onSetSeries: (String?, Double?) -> Unit = { _, _ -> },
+    onResetSeries: () -> Unit = {},
+    onHide: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val editsVersion by LiburuEdits.version.collectAsState()
@@ -202,20 +205,46 @@ internal fun LiburuBookDetails(
             }
             when (tab) {
                 0 -> {
-                    details.metadata.description?.let { text ->
-                        item(key = "synopsis") {
-                            Column(pad.padding(top = 18.dp)) {
+                    item(key = "synopsis") {
+                        val epub = original.metadata.description
+                        val gbDesc = net?.optJSONObject("gb")?.optString("desc")?.takeIf { it.isNotBlank() && it != "null" }
+                        val text = edits["synopsis"] ?: epub ?: gbDesc
+                        val sourceName = when {
+                            edits["synopsis"] != null -> stringResource(R.string.liburu_bd_src_you)
+                            epub != null -> "EPUB"
+                            else -> "Google Books"
+                        }
+                        Column(pad.padding(top = 18.dp)) {
+                            if (text != null) {
                                 Text(
-                                    stringResource(R.string.liburu_bd_synopsis, "EPUB"),
+                                    stringResource(R.string.liburu_bd_synopsis, sourceName),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Description(book.url, text, Modifier.padding(top = 6.dp))
+                            } else {
+                                Text(stringResource(R.string.liburu_bd_no_synopsis), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.OutlinedButton(onClick = refresh, enabled = !fetching) {
+                                        Text(stringResource(R.string.liburu_bd_find_synopsis), fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    TextButton(onClick = { editing = true }) {
+                                        Text(stringResource(R.string.liburu_bd_write_synopsis), fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
                     }
                     item(key = "facts") { Facts(details, sessions, etaSeconds, pad) }
+                    net?.optJSONObject("hc")?.takeIf { it.optBoolean("found") }?.let { hc ->
+                        item(key = "community") { Community(hc, pad) }
+                    }
                     item(key = "biblio") { Biblio(details, net, pad) }
+                    net?.optJSONArray("byAuthor")?.takeIf { it.length() > 0 }?.let { arr ->
+                        item(key = "byauthor") { ByAuthor(details.book.author.orEmpty(), arr, pad) }
+                    }
+                    item(key = "where") { WhereToFind(details, pad) }
                     item(key = "file") { FileInfo(details, pad) }
                     item(key = "edit") {
                         Column(pad.padding(top = 16.dp)) {
@@ -258,7 +287,19 @@ internal fun LiburuBookDetails(
                 }
             }
         }
-        TopButtons(details, scrolled, onBack, onOpenStats, onEdit = { editing = true })
+        var assigning by remember { mutableStateOf(false) }
+        TopButtons(
+            details, scrolled, onBack,
+            actions = listOf(
+                R.string.liburu_bd_find_synopsis_net to refresh,
+                R.string.liburu_bd_write_synopsis_long to { editing = true },
+                R.string.liburu_bd_edit to { editing = true },
+                R.string.liburu_bd_assign_series to { assigning = true },
+                R.string.reading_stats to onOpenStats,
+                R.string.liburu_bd_hide to onHide,
+            ),
+        )
+        if (assigning) SeriesDialog(details, onSetSeries, onResetSeries) { assigning = false }
         if (editing) EditDialog(original, edits) { editing = false }
     }
 }
@@ -281,7 +322,7 @@ private fun Hero(details: BookDetails, color: Color?) {
 }
 
 @Composable
-private fun TopButtons(details: BookDetails, scrolled: Boolean, onBack: () -> Unit, onOpenStats: () -> Unit, onEdit: () -> Unit) {
+private fun TopButtons(details: BookDetails, scrolled: Boolean, onBack: () -> Unit, actions: List<Pair<Int, () -> Unit>>) {
     var menu by remember { mutableStateOf(false) }
     val bar = if (scrolled) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 1f) else Color.Transparent
     val chip = if (scrolled) MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 1f) else Color.White.copy(alpha = 0.2f)
@@ -302,10 +343,7 @@ private fun TopButtons(details: BookDetails, scrolled: Boolean, onBack: () -> Un
         )
         Box {
             RoundButton(chip, { menu = true }) { Icon(Icons.Outlined.MoreHoriz, stringResource(R.string.liburu_bd_more), tint = ink) }
-            DropdownMenu(menu, { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.liburu_bd_edit)) }, onClick = { menu = false; onEdit() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.reading_stats)) }, onClick = { menu = false; onOpenStats() })
-            }
+            if (menu) ActionSheet(details.book.displayTitle, actions) { menu = false }
         }
     }
 }
@@ -336,11 +374,15 @@ private fun Head(details: BookDetails, modifier: Modifier) {
         val author = book.author?.takeIf { it.isNotBlank() }
         val line = listOfNotNull(author, meta.published?.take(4)).joinToString(" · ")
         if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        if (meta.subjects.isNotEmpty()) {
+        val tags = remember(meta.subjects) {
+            meta.subjects.map { it.split("/", "--", " — ").last().trim() }.filter { it.isNotEmpty() && it.length <= 32 }
+                .distinctBy { it.lowercase() }.take(3)
+        }
+        if (tags.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                meta.subjects.forEach { s ->
+                tags.forEach { s ->
                     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
-                        Text(subjectLabel(s), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        Text(s, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -762,3 +804,258 @@ private fun Biblio(details: BookDetails, net: JSONObject?, modifier: Modifier) {
 private fun publishedShort(iso: String, locale: java.util.Locale): String =
     runCatching { LocalDate.parse(iso.take(10)).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)) }
         .getOrDefault(iso)
+
+/** The web's ⋯ sheet: the book's title, one wide button per action, and Close. */
+@Composable
+private fun ActionSheet(title: String, actions: List<Pair<Int, () -> Unit>>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                actions.forEach { (label, run) ->
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { onDismiss(); run() },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    ) { Text(stringResource(label), style = MaterialTheme.typography.titleMedium) }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface),
+            ) { Text(stringResource(R.string.liburu_bd_close), style = MaterialTheme.typography.titleMedium) }
+        },
+    )
+}
+
+/** Puts the book in a series (or takes it out); Restore goes back to the catalogue's. */
+@Composable
+private fun SeriesDialog(details: BookDetails, onSet: (String?, Double?) -> Unit, onReset: () -> Unit, onDone: () -> Unit) {
+    var name by remember { mutableStateOf(details.book.seriesName.orEmpty()) }
+    var number by remember {
+        mutableStateOf(details.book.seriesIndex?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }.orEmpty())
+    }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(stringResource(R.string.liburu_bd_assign_series)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.liburu_bd_series_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(number, { number = it }, label = { Text(stringResource(R.string.liburu_bd_series_number)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val n = name.trim().takeIf { it.isNotEmpty() }
+                onSet(n, if (n == null) null else number.replace(',', '.').toDoubleOrNull())
+                onDone()
+            }) { Text(stringResource(R.string.liburu_bd_save)) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onReset(); onDone() }) { Text(stringResource(R.string.liburu_ed_reset)) }
+                TextButton(onClick = onDone) { Text(stringResource(android.R.string.cancel)) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun Stars(value: Double, size: androidx.compose.ui.unit.Dp) {
+    Row {
+        (1..5).forEach { n ->
+            Icon(
+                if (value >= n - 0.25) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                null,
+                tint = if (value >= n - 0.25) Gold else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(size),
+            )
+        }
+    }
+}
+
+/** «Opiniones de la comunidad», from Hardcover through the user's Worker. */
+@Composable
+private fun Community(hc: JSONObject, modifier: Modifier) {
+    val context = LocalContext.current
+    val rating = hc.optDouble("rating", 0.0)
+    val count = hc.optInt("ratingsCount")
+    val readers = hc.optInt("readers")
+    Column(modifier) {
+        SectionTitle(stringResource(R.string.liburu_bd_community))
+        if (rating > 0) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(String.format(java.util.Locale.getDefault(), if (rating % 1.0 == 0.0) "%.0f" else "%.1f", rating), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.SemiBold)
+                Text("/5", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+            }
+            Stars(rating, 22.dp)
+        }
+        Text(
+            stringResource(R.string.liburu_bd_ratings_readers, count, readers),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        hc.optJSONArray("dist")?.let { d ->
+            val counts = (0 until d.length()).map { d.optInt(it) }
+            val max = counts.maxOrNull()?.coerceAtLeast(1) ?: 1
+            Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                counts.forEachIndexed { i, c ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${5 - i} ★", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(44.dp))
+                        Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                            Box(Modifier.fillMaxWidth(c.toFloat() / max).height(8.dp).background(Gold))
+                        }
+                        Text("$c", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp).width(28.dp))
+                    }
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.liburu_bd_source_hc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+        val reviews = hc.optJSONArray("reviews")
+        if (reviews != null) {
+            for (i in 0 until minOf(reviews.length(), 3)) {
+                val r = reviews.getJSONObject(i)
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Column(Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(r.optString("user"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Text(r.optString("date").take(10), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        r.optDouble("rating", 0.0).takeIf { it > 0 }?.let { Box(Modifier.padding(top = 6.dp)) { Stars(it, 18.dp) } }
+                        var open by remember { mutableStateOf(false) }
+                        Text(
+                            r.optString("text"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = if (open) Int.MAX_VALUE else 6,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 8.dp).clickable { open = !open },
+                        )
+                    }
+                }
+            }
+        }
+        hc.optString("link").takeIf { it.isNotEmpty() }?.let { link ->
+            TextButton(onClick = { openUrl(context, link) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 6.dp)) {
+                Text(stringResource(R.string.liburu_bd_all_reviews), fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+}
+
+/** «Otros libros de …», with what the library already holds marked. */
+@Composable
+private fun ByAuthor(author: String, arr: org.json.JSONArray, modifier: Modifier) {
+    val context = LocalContext.current
+    val books = (0 until arr.length()).map { arr.getJSONObject(it) }
+    val owned by produceState(emptySet<String>(), author) {
+        value = withContext(Dispatchers.IO) {
+            context.container.database.bookDao().allOnce().filter { it.author == author }.map { it.displayTitle.lowercase().take(14) }.toSet()
+        }
+    }
+    Column(modifier) {
+        SectionTitle(stringResource(R.string.liburu_bd_by_author, author))
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            items(books.size) { i ->
+                val b = books[i]
+                Column(Modifier.width(120.dp).clickable { b.optString("link").takeIf { it.isNotEmpty() }?.let { openUrl(context, it) } }) {
+                    Box(
+                        Modifier.fillMaxWidth().aspectRatio(2f / 3f).shadow(5.dp, LiburuCoverShape).clip(LiburuCoverShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(b.optString("title"), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(8.dp))
+                        b.optString("cover").takeIf { it.isNotEmpty() }?.let {
+                            coil3.compose.AsyncImage(it, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    if (b.optString("title").lowercase().take(14) in owned) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), modifier = Modifier.padding(top = 6.dp)) {
+                            Text(stringResource(R.string.liburu_dc_in_library), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                        }
+                    }
+                    Text(b.optString("title"), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                    Text(listOf(b.optString("author"), b.optString("year")).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+/** «Dónde encontrarlo»: the web's searches, by kind. */
+@Composable
+private fun WhereToFind(details: BookDetails, modifier: Modifier) {
+    val context = LocalContext.current
+    val t = details.book.displayTitle
+    val a = details.book.author.orEmpty()
+    val enc = { x: String -> java.net.URLEncoder.encode(x, "UTF-8") }
+    val q = enc("$t $a".trim())
+    val isbn = details.metadata.identifiers.firstOrNull { it.scheme == "isbn" }?.value?.filter { it.isDigit() }?.takeIf { it.length == 13 }
+    val ivoox = { x: String ->
+        val slug = java.text.Normalizer.normalize(x.lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}"), "")
+            .replace(Regex("[^a-z0-9]+"), "-").trim('-')
+        "https://www.ivoox.com/${slug}_sb.html?sb=${enc(x.trim())}"
+    }
+    val groups = listOf(
+        R.string.liburu_wf_buy to listOf(
+            "Play Libros" to "https://play.google.com/store/search?q=$q&c=books",
+            "Kobo" to "https://www.kobo.com/es/es/search?query=$q",
+            "Amazon" to "https://www.amazon.es/s?k=$q&i=digital-text",
+            "Casa del Libro" to "https://www.casadellibro.com/?q=$q",
+            "Librerías independientes" to "https://www.todostuslibros.com/busquedas?keyword=$q",
+        ),
+        R.string.liburu_wf_audio to listOf(
+            "Libro.fm (sin DRM)" to "https://libro.fm/search?q=$q",
+            "Storytel" to "https://www.storytel.com/es/search?query=$q",
+        ),
+        R.string.liburu_wf_free to listOf(
+            "eBiblio (préstamo)" to "https://ebiblio.es",
+            "Project Gutenberg" to "https://www.gutenberg.org/ebooks/search/?query=$q",
+            "textos.info" to "https://www.google.com/search?q=${enc("site:textos.info $t $a")}",
+        ),
+        R.string.liburu_wf_communities to listOf(
+            "Babelio" to "https://www.babelio.com/es/resrecherche.php?Recherche=$q",
+            "Goodreads" to (isbn?.let { "https://www.goodreads.com/book/isbn/$it" } ?: "https://www.goodreads.com/search?q=$q"),
+            "Hardcover" to "https://hardcover.app/search?q=$q",
+        ),
+        R.string.liburu_wf_reviews to listOf(
+            "Lecturalia" to "https://www.lecturalia.com/buscar?q=$q",
+            "Qué libro leo" to "https://quelibroleo.com/buscar?q=$q",
+        ),
+        R.string.liburu_wf_podcasts to (
+            listOf("Spotify · el libro" to "https://open.spotify.com/search/${enc("$t $a".trim())}/episodes", "iVoox · el libro" to ivoox(t)) +
+                (if (a.isNotBlank()) listOf("Spotify · el autor" to "https://open.spotify.com/search/${enc(a)}/episodes", "iVoox · el autor" to ivoox(a)) else emptyList())
+            ),
+        R.string.liburu_wf_videos to (if (a.isNotBlank()) listOf("Entrevistas del autor en YouTube" to "https://www.youtube.com/results?search_query=${enc("$a entrevista")}") else emptyList()),
+    ).filter { it.second.isNotEmpty() }
+    Column(modifier) {
+        SectionTitle(stringResource(R.string.liburu_bd_where))
+        groups.forEach { (label, links) ->
+            Text(stringResource(label), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp, bottom = 10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                links.forEach { (name, url) ->
+                    Surface(
+                        onClick = { openUrl(context, url) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Transparent,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        Text("$name ↗", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+                    }
+                }
+            }
+        }
+    }
+}

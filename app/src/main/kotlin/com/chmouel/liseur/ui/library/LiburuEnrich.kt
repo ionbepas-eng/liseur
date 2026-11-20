@@ -103,6 +103,8 @@ object LiburuEnrich {
                 .put("rating", rated?.optDouble("averageRating") ?: 0.0)
                 .put("ratingsCount", rated?.optInt("ratingsCount") ?: 0)
                 .put("link", best.optString("infoLink"))
+                .put("desc", sorted.firstOrNull { it.optString("description").length > 80 }?.optString("description")
+                    ?.replace(Regex("<[^>]+>"), " ")?.replace(Regex("\\s+"), " ")?.trim()?.take(1500).orEmpty())
         }
         return null
     }

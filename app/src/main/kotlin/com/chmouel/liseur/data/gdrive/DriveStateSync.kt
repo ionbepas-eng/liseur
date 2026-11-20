@@ -93,6 +93,7 @@ class DriveStateSync(
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
         runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
+        runCatching { LiburuCovers.fill(bookDao) }.onFailure { Log.w(TAG, "covers failed", it) }
     }
 
     /**

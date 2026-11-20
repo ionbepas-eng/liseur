@@ -292,6 +292,10 @@ interface BookDao {
     @Query("SELECT * FROM books ORDER BY title COLLATE NOCASE")
     fun observeAll(): Flow<List<Book>>
 
+    /** Liburuville: a cover found on the internet for a book not yet downloaded. */
+    @Query("UPDATE books SET cover_url = :cover WHERE url = :url AND cover_path IS NULL")
+    suspend fun setFoundCover(url: String, cover: String)
+
     @Query("SELECT * FROM books ORDER BY title COLLATE NOCASE")
     suspend fun allOnce(): List<Book>
 

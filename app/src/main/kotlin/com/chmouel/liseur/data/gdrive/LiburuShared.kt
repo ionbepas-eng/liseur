@@ -44,6 +44,16 @@ object LiburuShared {
         version.value++
     }
 
+    /** A flashcard answer: «La sabía» counts a review, «Otra vez» only moves it back. */
+    fun reviewWord(context: Context, id: String, ok: Boolean) {
+        val all = read(context, VOCAB)
+        val now = System.currentTimeMillis()
+        all.optJSONObject(id)?.let {
+            it.put("reviews", it.optInt("reviews") + if (ok) 1 else 0).put("lastReview", now).put("t", now)
+            write(context, VOCAB, all); version.value++
+        }
+    }
+
     fun deleteWord(context: Context, id: String) {
         val all = read(context, VOCAB)
         all.optJSONObject(id)?.let { it.put("deleted", true).put("t", System.currentTimeMillis()); write(context, VOCAB, all); version.value++ }

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -765,7 +767,10 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
     val earned = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
     val total = ACHIEVEMENTS.sumOf { it.tiers.size }
     var open by remember { mutableStateOf<Achv?>(null) }
+    var page by remember { mutableStateOf(false) }
+    if (page) LogrosPage(data, zone, values, onBadge = { open = it }) { page = false }
     Card("Logros", "$earned de $total") {
+        TextButton(onClick = { page = true }) { Text("Ver nivel, retos e insignias ›") }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(ACHIEVEMENTS, key = { it.id }) { a ->
                 val v = values[a.id] ?: 0.0
@@ -933,3 +938,142 @@ private val MONTH_INK = listOf("#fff", "#fff", "#21412b", "#4a1420", "#3b2a05", 
     .map { Color(android.graphics.Color.parseColor(if (it.length == 4) "#" + it.drop(1).map { c -> "$c$c" }.joinToString("") else it)) }
 
 private fun Modifier.androidxClip() = this.then(Modifier.clip(RoundedCornerShape(16.dp)))
+
+
+// --- Logros: nivel, retos e insignias, as on the web -------------------------------------------
+
+private val LEVELS = listOf(0 to "Curioso", 500 to "Hojeador", 1500 to "Lector", 3500 to "Lector asiduo", 7000 to "Devorador", 12000 to "Bibliófilo",
+    20000 to "Ratón de biblioteca", 32000 to "Erudito", 50000 to "Sabio", 75000 to "Guardián de Alejandría", 110000 to "Leyenda", 160000 to "Inmortal")
+
+private data class Reto(val id: String, val type: String, val target: Int, val from: Long, val to: Long, val name: String?, val bookKey: String?, val auto: Boolean)
+
+private fun retoTitle(r: Reto, data: StatsData): String = r.name?.takeIf { it.isNotBlank() } ?: when (r.type) {
+    "pages" -> "Lee ${fmtNum(r.target.toDouble())} páginas"
+    "minutes" -> if (r.target % 60 == 0) "Lee ${r.target / 60} ${if (r.target == 60) "hora" else "horas"}" else "Lee ${r.target} minutos"
+    "books" -> "Termina ${r.target} ${if (r.target == 1) "libro" else "libros"}"
+    "days" -> "Lee ${r.target} días distintos"
+    "en" -> "Termina ${r.target} ${if (r.target == 1) "libro" else "libros"} en inglés"
+    "classic" -> if (r.target == 1) "Termina un clásico" else "Termina ${r.target} clásicos"
+    "words" -> "Guarda ${r.target} palabras nuevas"
+    "highlights" -> "Haz ${r.target} subrayados"
+    "morning" -> "Lee ${r.target} veces antes de las 9"
+    "finish" -> "Termina «${r.bookKey?.let { data.byKey[it]?.title } ?: "el libro"}»"
+    else -> "Reto"
+}
+
+@Composable
+private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double>, onBadge: (Achv) -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val state = remember { runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull() ?: JSONObject() }
+    val fin = data.finishedAt
+    fun progress(r: Reto): Double {
+        val ses = data.sits.filter { it.start >= r.from && it.start < r.to }
+        val finIn = fin.filter { it.value >= r.from && it.value < r.to }.keys
+        return when (r.type) {
+            "pages" -> ses.sumOf { data.sitPages(it) }
+            "minutes" -> ses.sumOf { it.seconds } / 60
+            "books" -> finIn.size.toDouble()
+            "days" -> ses.map { dayOf(it.start, zone) }.toSet().size.toDouble()
+            "en" -> finIn.count { data.peek(it)?.optString("lang")?.lowercase()?.startsWith("en") == true }.toDouble()
+            "words" -> com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context).count { it.optLong("created") in r.from until r.to }.toDouble()
+            "morning" -> ses.count { Instant.ofEpochMilli(it.start).atZone(zone).hour < 9 }.toDouble()
+            "finish" -> if (r.bookKey != null && (fin[r.bookKey] ?: 0) in r.from until r.to) 1.0 else 0.0
+            else -> 0.0
+        }
+    }
+    val now = YearMonth.now(zone)
+    val retos = remember(data) {
+        val start = now.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val end = now.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        fun span(k: Long) = now.minusMonths(k).let { m -> m.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() to m.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() }
+        val prev = (1L..3L).map { span(it) }
+        val avgPages = prev.sumOf { (f, t) -> progress(Reto("", "pages", 0, f, t, null, null, true)) } / 3
+        val avgDays = prev.sumOf { (f, t) -> progress(Reto("", "days", 0, f, t, null, null, true)) } / 3
+        fun round(v: Double, k: Int) = maxOf(k, (Math.round(v / k) * k).toInt())
+        val pages = minOf(3000, round(maxOf(300.0, avgPages * 1.1), 50))
+        val days = minOf(now.lengthOfMonth(), maxOf(10, Math.round(avgDays).toInt() + 2))
+        val vars = listOf("en" to 1, "words" to 15, "highlights" to 10, "morning" to 5, "classic" to 1, "books" to 2, "minutes" to 600)
+        val (vt, vn) = vars[(now.year * 12 + now.monthValue - 1) % vars.size]
+        val mk = "${now.year}-${now.monthValue - 1}"
+        val auto = listOf(Reto("auto-$mk-pages", "pages", pages, start, end, null, null, true), Reto("auto-$mk-days", "days", days, start, end, null, null, true), Reto("auto-$mk-$vt", vt, vn, start, end, null, null, true))
+        val raw = state.optJSONObject("retos") ?: JSONObject()
+        val mine = raw.keys().asSequence().mapNotNull { raw.optJSONObject(it) }.filter { !it.optBoolean("deleted") && it.optLong("to") > System.currentTimeMillis() }
+            .map { Reto(it.optString("id"), it.optString("type"), it.optInt("target", 1), it.optLong("from"), it.optLong("to"), it.optString("name").takeIf { n -> n.isNotBlank() && n != "null" }, it.optString("bookId").takeIf { b -> b.isNotBlank() && b != "null" }, false) }.toList()
+        auto + mine
+    }
+    val tiers = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
+    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50
+    val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
+    val next = LEVELS.getOrNull(li + 1)
+    val pct = next?.let { ((xp - LEVELS[li].first) / (it.first - LEVELS[li].first)).toFloat() } ?: 1f
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                item { TextButton(onClick = onClose) { Text("‹ Estadísticas") } }
+                item { Text("Logros", style = MaterialTheme.typography.displaySmall) }
+                item {
+                    Card {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(64.dp).background(Gold, CircleShape), contentAlignment = Alignment.Center) { Text("${li + 1}", style = MaterialTheme.typography.headlineMedium, color = Color(0xFF3A2A0A)) }
+                            Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                                Text("Nivel ${li + 1} · ${LEVELS[li].second}", style = MaterialTheme.typography.titleLarge)
+                                Text(next?.let { "${fmtNum(xp)} de ${fmtNum(it.first.toDouble())} puntos para «${it.second}»" } ?: "${fmtNum(xp)} puntos · nivel máximo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                androidx.compose.material3.LinearProgressIndicator(progress = { pct.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), color = Gold, drawStopIndicator = {})
+                            }
+                        }
+                        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LEVELS.forEachIndexed { i, _ ->
+                                Box(Modifier.weight(1f).height(22.dp).background(if (i <= li) Gold else MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                                    Text("${i + 1}", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+                item { Text("Retos", style = MaterialTheme.typography.headlineSmall) }
+                items(retos, key = { it.id }) { r ->
+                    val v = progress(r)
+                    val days = ((r.to - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
+                    Card {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (v >= r.target) "✅" else "🚩", fontSize = 22.sp)
+                            Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                                Text(retoTitle(r, data), style = MaterialTheme.typography.titleMedium)
+                                Text("${fmtNum(minOf(v, r.target.toDouble()))} / ${fmtNum(r.target.toDouble())} · ${if (v >= r.target) "conseguido" else "quedan $days días"}${if (r.auto) "" else " · tuyo"}",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                androidx.compose.material3.LinearProgressIndicator(progress = { (v / r.target).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), drawStopIndicator = {})
+                            }
+                        }
+                    }
+                }
+                item { Text("Los retos propios se crean en la web por ahora; aquí ves su progreso.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Insignias", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                        Text("$tiers de ${ACHIEVEMENTS.sumOf { it.tiers.size }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                items(ACHIEVEMENTS.chunked(3)) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { a ->
+                            val v = values[a.id] ?: 0.0
+                            val tier = a.tiers.count { v >= it }
+                            val nx = a.tiers.getOrNull(tier)
+                            val color = if (tier == 0) MaterialTheme.colorScheme.surfaceContainerHighest else if (a.tiers.size == 1) Gold else TIER_COLORS[tier - 1]
+                            Column(Modifier.weight(1f).clickable { onBadge(a) }.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(Modifier.size(72.dp).background(color, CircleShape), contentAlignment = Alignment.Center) {
+                                    Text(a.glyph, fontSize = 32.sp)
+                                    if (tier == 0) Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape))
+                                }
+                                Text(if (tier > 0 && a.tiers.size > 1) "${a.name} · ${TIER_NAMES[tier - 1]}" else a.name, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
+                                Text(nx?.let { a.desc(it) } ?: "Completo", style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                nx?.let { androidx.compose.material3.LinearProgressIndicator(progress = { (v / it).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), drawStopIndicator = {}) }
+                            }
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+}

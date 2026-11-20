@@ -530,8 +530,13 @@ private fun VocabSection() {
     val v by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
     val words = remember(v) { com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context) }
     var query by remember { mutableStateOf("") }
+    var review by remember { mutableStateOf(false) }
+    if (review && words.isNotEmpty()) { VocabReview(words) { review = false }; return }
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Vocabulario", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Vocabulario", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (words.isNotEmpty()) androidx.compose.material3.Button(onClick = { review = true }) { Text("Repasar") }
+        }
         Text("${words.size} ${if (words.size == 1) "palabra" else "palabras"} · las guardas desde el diccionario del lector", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (words.isNotEmpty()) androidx.compose.material3.OutlinedTextField(query, { query = it }, placeholder = { Text("Buscar palabra") }, singleLine = true, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
         words.filter { query.isBlank() || it.optString("word").contains(query, true) || it.optString("def").contains(query, true) }.forEach { w ->
@@ -549,6 +554,59 @@ private fun VocabSection() {
                         androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Delete, "Quitar")
                     }
                 }
+            }
+        }
+    }
+}
+
+
+/** The web's flashcards: least-reviewed first, tap to turn, «Otra vez» / «La sabía». */
+@Composable
+private fun VocabReview(words: List<org.json.JSONObject>, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val order = remember { words.sortedWith(compareBy({ it.optInt("reviews") }, { it.optLong("lastReview") })) }
+    var i by remember { mutableStateOf(0) }
+    var show by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(onBack = onDone)
+    val w = order[i % order.size]
+    fun str(k: String) = w.optString(k).takeIf { it.isNotBlank() && it != "null" }
+    val tts = remember { arrayOfNulls<android.speech.tts.TextToSpeech>(1) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        tts[0] = android.speech.tts.TextToSpeech(context) {}
+        onDispose { tts[0]?.shutdown() }
+    }
+    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.TextButton(onClick = onDone) { Text("✕ Terminar") }
+            Spacer(Modifier.weight(1f))
+            Text("${i + 1} / ${order.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp).clickable { show = !show },
+        ) {
+            Column(Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
+                Text(w.optString("word"), style = MaterialTheme.typography.displaySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                str("phonetic")?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                str("context")?.let { Text("«$it»", style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                if (show) {
+                    Text(str("tr") ?: "—", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    str("def")?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                } else Text("Toca para ver la traducción", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.material3.OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                tts[0]?.let { t -> runCatching { t.language = java.util.Locale.forLanguageTag(w.optString("lang")) }; t.speak(str("lemma") ?: w.optString("word"), android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "v") }
+            }) { Text("🔊 Escuchar") }
+            if (show) {
+                fun next(ok: Boolean) {
+                    com.chmouel.liseur.data.gdrive.LiburuShared.reviewWord(context, w.optString("id"), ok)
+                    show = false
+                    if (i + 1 >= order.size) { android.widget.Toast.makeText(context, "¡Repaso terminado!", android.widget.Toast.LENGTH_SHORT).show(); onDone() } else i++
+                }
+                androidx.compose.material3.OutlinedButton(modifier = Modifier.weight(1f), onClick = { next(false) }) { Text("Otra vez") }
+                androidx.compose.material3.Button(modifier = Modifier.weight(1f), onClick = { next(true) }) { Text("La sabía") }
             }
         }
     }

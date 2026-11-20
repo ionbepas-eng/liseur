@@ -55,10 +55,12 @@ internal fun LibrarySections(
     val labels = buildList {
         add(0 to R.string.library_section_books)
         if (seriesAvailable) add(1 to R.string.library_section_series)
+        add(3 to R.string.library_section_shelves)
         add(2 to R.string.library_section_notes)
     }
     val index = labels.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    PrimaryTabRow(
+    androidx.compose.material3.PrimaryScrollableTabRow(
+        edgePadding = 0.dp,
         selectedTabIndex = index,
         containerColor = Color.Transparent,
         modifier = modifier.fillMaxWidth(),

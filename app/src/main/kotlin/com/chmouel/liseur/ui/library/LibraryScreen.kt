@@ -536,6 +536,7 @@ fun LibraryScreen(
     val showHome = !archived && layout.tabs && homeTab
     val showSeries = !showHome && !archived && state.seriesView && state.series.isNotEmpty()
     var notesShown by rememberSaveable { mutableStateOf(false) }
+    var shelvesShown by rememberSaveable { mutableStateOf(false) }
     val activeStyle = if (showHome) LibraryStyle.HOME else catalogueStyle
     val scrollStyleToTop: (LibraryStyle) -> Unit = { target ->
         scope.launch {
@@ -936,6 +937,7 @@ fun LibraryScreen(
                 if (sectionsShown) {
                     LibrarySections(
                         selected = when {
+                            shelvesShown -> 3
                             notesShown -> 2
                             showSeries -> 1
                             else -> 0
@@ -943,13 +945,21 @@ fun LibraryScreen(
                         seriesAvailable = state.series.isNotEmpty(),
                         onSelect = { section ->
                             notesShown = section == 2
-                            if (section != 2) showCatalogue(section == 1)
+                            shelvesShown = section == 3
+                            if (section < 2) showCatalogue(section == 1)
                         },
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
                 when {
                     state.loading -> LibrarySkeleton(fillAboveBar)
+
+                    sectionsShown && shelvesShown -> ShelvesOverview(
+                        books = state.books,
+                        onOpenBook = openShelfBook,
+                        bottomInset = bottomInset,
+                        modifier = Modifier.fillMaxSize(),
+                    )
 
                     sectionsShown && notesShown -> NotesOverview(
                         onOpenBook = openShelfBook,

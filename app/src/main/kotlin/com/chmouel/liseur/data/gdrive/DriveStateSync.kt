@@ -159,6 +159,8 @@ class DriveStateSync(
         }
 
         if (syncBooks(state)) changed = true
+        val hadShelfEdits = com.chmouel.liseur.ui.library.LiburuShelves.applyPending(app, state)
+        if (hadShelfEdits) changed = true
 
         // Kept for the Home level and challenges, which read the web's books, shelves and retos.
         File(app.filesDir, STATE_CACHE).writeText(state.toString())
@@ -177,6 +179,7 @@ class DriveStateSync(
             ).build()
         }
         http.newCall(request).execute().use { if (!it.isSuccessful) throw IOException("state upload ${it.code}") }
+        if (hadShelfEdits) com.chmouel.liseur.ui.library.LiburuShelves.clearPending(app)
     }
 
     private suspend fun apply(remote: JSONObject) {
@@ -216,21 +219,31 @@ class DriveStateSync(
             val local = progressDao.get(book.url)
             val localAt = local?.updatedAt ?: 0L
             if (web != null && webAt > localAt + 2_000) {
-                val fraction = pos?.optDouble("fraction")?.takeIf { it.isFinite() && it in 0.0..1.0 }
+                val webFraction = pos?.optDouble("fraction")?.takeIf { it.isFinite() && it in 0.0..1.0 }
+                // Only a place actually newer and actually elsewhere replaces this device's exact one.
+                val fraction = webFraction?.takeIf {
+                    (pos?.optLong("t") ?: 0L) > localAt + 2_000 &&
+                        kotlin.math.abs(it - (local?.totalProgression ?: -1.0)) > 0.005
+                }
+                val localStatus = when {
+                    book.finishedAt != null -> "finished"
+                    local?.override == com.chmouel.liseur.domain.FinishedOverride.DID_NOT_FINISH -> "did_not_finish"
+                    local?.override == com.chmouel.liseur.domain.FinishedOverride.WANT_TO_READ -> "want_to_read"
+                    else -> null
+                }
                 val status = when (meta?.optString("status")) {
                     "finished" -> "finished"
                     "dropped" -> "did_not_finish"
                     "want" -> "want_to_read"
-                    "reading" -> if (fraction == null) "reading" else null
                     else -> null
-                }
+                }?.takeIf { it != localStatus && (meta?.optLong("t") ?: 0L) > localAt + 2_000 }
                 if (fraction != null || status != null) {
                     pulls += com.chmouel.liseur.domain.BackedUpReadingPosition(
                         bookId = book.url,
                         title = book.title,
                         author = book.author,
-                        locatorJson = "{}",
-                        progression = fraction,
+                        locatorJson = if (fraction == null) local?.locatorJson ?: "{}" else "{}",
+                        progression = fraction ?: local?.totalProgression,
                         readAt = webAt,
                         readingStatus = status,
                     )

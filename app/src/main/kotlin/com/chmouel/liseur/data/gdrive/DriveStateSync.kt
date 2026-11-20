@@ -47,6 +47,7 @@ class DriveStateSync(
 ) {
     private val app = context.applicationContext
     private val lock = Mutex()
+    private val hcChanges = mutableListOf<Pair<String, HardcoverSync.Change>>()
     @Volatile private var lastRun = 0L
 
     private val deviceId: String by lazy {
@@ -180,6 +181,10 @@ class DriveStateSync(
         }
         http.newCall(request).execute().use { if (!it.isSuccessful) throw IOException("state upload ${it.code}") }
         if (hadShelfEdits) com.chmouel.liseur.ui.library.LiburuShelves.clearPending(app)
+        // Only once the shared file is written, so a failed upload is retried with them.
+        val hc = HardcoverSync(app, com.chmouel.liseur.data.remote.RemoteHttp.default())
+        hcChanges.forEach { (key, change) -> hc.push(key, change); Thread.sleep(1_100) }
+        hcChanges.clear()
     }
 
     private suspend fun apply(remote: JSONObject) {
@@ -208,6 +213,7 @@ class DriveStateSync(
     private suspend fun syncBooks(state: JSONObject): Boolean {
         val books = state.optJSONObject("books") ?: JSONObject().also { state.put("books", it) }
         val pulls = mutableListOf<com.chmouel.liseur.domain.BackedUpReadingPosition>()
+        hcChanges.clear()
         var changed = false
         for (book in bookDao.allOnce()) {
             if (!book.url.startsWith(DRIVE_URL)) continue
@@ -275,6 +281,12 @@ class DriveStateSync(
                 entry.put("meta", newMeta)
                 books.put(webId, entry)
                 changed = true
+                if (status != (meta?.optString("status") ?: "none")) {
+                    hcChanges += webId to HardcoverSync.Change(
+                        book.title, book.author, status,
+                        newMeta.optLong("startedAt").takeIf { it > 0 }, newMeta.optLong("finishedAt").takeIf { it > 0 },
+                    )
+                }
             }
         }
         if (pulls.isNotEmpty()) runCatching { positions.restore(pulls) }

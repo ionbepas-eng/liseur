@@ -110,7 +110,36 @@ internal fun LiburuSettings() {
             )
         }
     }
+    LiburuHardcoverSettings()
     LiburuNewsSettings()
+}
+
+@Composable
+internal fun LiburuHardcoverSettings() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("liburu", android.content.Context.MODE_PRIVATE) }
+    var on by remember { mutableStateOf(prefs.getBoolean("hcSync", true)) }
+    SettingsGroup("Hardcover") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Marcar mis lecturas en Hardcover", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Al empezar, terminar o abandonar un libro aquí, se marca también en tu perfil de Hardcover, con sus fechas (a través de tu puente).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                androidx.compose.material3.Switch(checked = on, onCheckedChange = {
+                    on = it
+                    prefs.edit().putBoolean("hcSync", it).apply()
+                })
+            }
+            prefs.getString("hcLast", null)?.let {
+                Text("Último envío: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }
 
 @Composable

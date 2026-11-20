@@ -65,6 +65,8 @@ import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Dashboard
@@ -117,6 +119,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -538,6 +541,8 @@ fun LibraryScreen(
     val showSeries = !showHome && !archived && state.seriesView && state.series.isNotEmpty()
     var notesShown by rememberSaveable { mutableStateOf(false) }
     var shelvesShown by rememberSaveable { mutableStateOf(false) }
+    var comicsShown by rememberSaveable { mutableStateOf(false) }
+    val comicIds by LiburuComics.ids.collectAsState()
     val activeStyle = if (showHome) LibraryStyle.HOME else catalogueStyle
     val scrollStyleToTop: (LibraryStyle) -> Unit = { target ->
         scope.launch {
@@ -674,7 +679,8 @@ fun LibraryScreen(
                                 // force here, not of a -night qualifier: those
                                 // follow the system, and the app's own
                                 // light/dark setting is allowed to disagree.
-                                Image(
+                                // Liburuville: no brand tile; the title stands alone, as on the web.
+                                if (false) Image(
                                     painter = painterResource(
                                         if (darkMark) R.drawable.ic_reading_scene_night
                                         else R.drawable.ic_reading_scene,
@@ -691,7 +697,6 @@ fun LibraryScreen(
                                         .aspectRatio(BRAND_TILE_ASPECT)
                                         .clip(RoundedCornerShape(if (wide) 14.dp else 10.dp)),
                                 )
-                                Spacer(Modifier.width(if (wide) 16.dp else 10.dp))
                                 Column(Modifier.weight(1f)) {
                                     // With the tabs, the bar names the tab, so
                                     // Home and Library never look like one screen.
@@ -702,15 +707,12 @@ fun LibraryScreen(
                                             showSeries -> stringResource(R.string.home_tile_series)
                                             else -> stringResource(R.string.library_tab_library)
                                         },
-                                        style = if (wide) {
-                                            MaterialTheme.typography.headlineMedium
-                                        } else {
-                                            MaterialTheme.typography.titleLarge
-                                        },
+                                        style = MaterialTheme.typography.displaySmall,
+                                        fontWeight = FontWeight.SemiBold,
                                     )
                                     if (showHome && !onboarding) {
                                         pulse?.let { PulseLine(it, onOpenStats) }
-                                    } else if (!showSeries && !state.loading && state.books.isNotEmpty()) {
+                                    } else if (false && !showSeries && !state.loading && state.books.isNotEmpty()) {
                                         Text(
                                             text = shelfCountLine(state),
                                             maxLines = 1,
@@ -740,14 +742,30 @@ fun LibraryScreen(
                     // it, a title alone in that much space is just a gap.
                     expandedHeight = if (archived) 64.dp else libraryBarHeight(barWidth),
                     actions = {
-                        IconButton(onClick = { onSetSearchActive(true) }) {
+                        // Liburuville: on the library itself, search and Add live in
+                        // the page (as on the web) and the bar keeps a round refresh.
+                        val webLike = !showHome && !archived
+                        if (webLike) {
+                            androidx.compose.material3.Surface(
+                                onClick = onRefresh,
+                                shape = androidx.compose.foundation.shape.CircleShape,
+                                color = Color.Transparent,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.size(52.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.Refresh, contentDescription = stringResource(R.string.liburu_lib_refresh))
+                                }
+                            }
+                        }
+                        if (!webLike) IconButton(onClick = { onSetSearchActive(true) }) {
                             Icon(
                                 Icons.Outlined.Search,
                                 contentDescription = stringResource(R.string.search_books),
                             )
                         }
                         var addMenuOpen by remember { mutableStateOf(false) }
-                        Box {
+                        if (!webLike) Box {
                             IconButton(onClick = { addMenuOpen = true }) {
                                 Icon(
                                     Icons.Outlined.Add,
@@ -905,6 +923,15 @@ fun LibraryScreen(
                 .padding(padding.withoutBottom())
                 .consumeWindowInsets(padding),
         ) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalLiburuLibActions provides LiburuLibActions(
+                    onSearch = { onSetSearchActive(true) },
+                    onRefresh = onRefresh,
+                    onAddBook = onAddBook,
+                    onAddFolder = onAddFolder,
+                    onConnect = onConnectServer,
+                ),
+            ) {
             Column(Modifier.fillMaxSize()) {
                 if (syncing) {
                     Text(
@@ -941,15 +968,18 @@ fun LibraryScreen(
                             shelvesShown -> 3
                             notesShown -> 2
                             showSeries -> 1
+                            comicsShown -> 4
                             else -> 0
                         },
                         seriesAvailable = state.series.isNotEmpty(),
+                        comicsAvailable = comicIds.isNotEmpty(),
                         onSelect = { section ->
                             notesShown = section == 2
                             shelvesShown = section == 3
-                            if (section < 2) showCatalogue(section == 1)
+                            comicsShown = section == 4
+                            if (section < 2 || section == 4) showCatalogue(section == 1)
                         },
-                        modifier = Modifier.padding(horizontal = 8.dp),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                     )
                 }
                 when {
@@ -1167,10 +1197,23 @@ fun LibraryScreen(
                     )
 
                     else -> {
-                        val shownState = if (activeStyle == state.layout.style) {
+                        val styled = if (activeStyle == state.layout.style) {
                             state
                         } else {
                             state.copy(layout = state.layout.copy(style = activeStyle))
+                        }
+                        // Liburuville: Libros and Cómics split the same shelf.
+                        val shownState = if (comicIds.isEmpty() || !sectionsShown) styled else {
+                            val keep: (Book) -> Boolean = { b -> (b.url in comicIds) == comicsShown }
+                            styled.copy(
+                                books = styled.books.filter(keep),
+                                shelfEntries = styled.shelfEntries.filter { e ->
+                                    when (e) {
+                                        is ShelfEntry.Single -> keep(e.book)
+                                        is ShelfEntry.Pile -> e.shelf.volumes.firstOrNull()?.book?.let(keep) ?: true
+                                    }
+                                },
+                            )
                         }
                         val controls: LibraryControls = { extra ->
                             LibraryControlsRow(
@@ -1232,6 +1275,7 @@ fun LibraryScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -2177,6 +2221,29 @@ internal fun LibraryControlsRow(
     onSetReadingFilter: ((Set<LibraryFilterOption>) -> Unit)? = null,
     extra: (@Composable () -> Unit)? = null,
 ) {
+    val liburu = LocalLiburuLibActions.current
+    if (liburu != null && !LocalEInk.current) {
+        LiburuControls(
+            state = state,
+            actions = liburu,
+            onSetSort = onSetSort,
+            onToggleSortDirection = onToggleSortDirection,
+            onSetReadingFilter = onSetReadingFilter,
+            onSetGroupBySeries = onSetGroupBySeries,
+            filterMenu = {
+                FilterMenu(
+                    state = state,
+                    onToggleFilter = onToggleFilter,
+                    onSetGroupBySeries = onSetGroupBySeries,
+                    onClearFilters = onClearFilters,
+                )
+            },
+            onChooseStyle = onChooseStyle,
+            extra = extra,
+            modifier = modifier,
+        )
+        return
+    }
     Column(modifier.fillMaxWidth()) {
         if (onSetReadingFilter != null && !state.filters.archived) {
             QuickFilterChips(
@@ -2493,6 +2560,20 @@ internal fun BookCard(
                         .height(4.dp),
                 )
             }
+        }
+        // Liburuville: as on the web, how far in and a «…» for the actions.
+        if (!LocalEInk.current && highlight.isNullOrBlank()) {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                val pct = when {
+                    book.finished -> 100
+                    else -> ((progression ?: 0.0) * 100).toInt()
+                }
+                Text("$pct %", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                IconButton(onClick = onLongClick, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Outlined.MoreHoriz, contentDescription = stringResource(R.string.book_actions), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            return@Column
         }
         // The actions are a long press away, as on every other cover,
         // so the title has the card's whole width.
@@ -2972,7 +3053,7 @@ internal fun ArchivedBadge(modifier: Modifier = Modifier) {
 
 /** The name of an order, for the button and the menu. */
 @Composable
-private fun LibrarySort.label(): String = stringResource(
+internal fun LibrarySort.label(): String = stringResource(
     when (this) {
         LibrarySort.RECENT -> R.string.sort_recent
         LibrarySort.TITLE -> R.string.sort_title

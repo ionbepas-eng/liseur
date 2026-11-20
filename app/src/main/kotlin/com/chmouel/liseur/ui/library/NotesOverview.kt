@@ -38,39 +38,57 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.graphics.luminance
 import com.chmouel.liseur.LiseurApplication
 import com.chmouel.liseur.R
 import com.chmouel.liseur.data.db.Book
 import com.chmouel.liseur.data.db.BookAnnotation
 import kotlinx.coroutines.flow.combine
 
-/** Liburuville: the sections across the top of the library, as on the web. */
+/** Liburuville: the sections across the top of the library, a pill as on the web. */
 @Composable
 internal fun LibrarySections(
     selected: Int,
     seriesAvailable: Boolean,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    comicsAvailable: Boolean = false,
 ) {
     val labels = buildList {
         add(0 to R.string.library_section_books)
+        if (comicsAvailable) add(4 to R.string.liburu_lib_comics)
         if (seriesAvailable) add(1 to R.string.library_section_series)
         add(3 to R.string.library_section_shelves)
         add(2 to R.string.library_section_notes)
     }
-    val index = labels.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    androidx.compose.material3.PrimaryScrollableTabRow(
-        edgePadding = 0.dp,
-        selectedTabIndex = index,
-        containerColor = Color.Transparent,
+    val ink = MaterialTheme.colorScheme.onSurface
+    val paper = if (ink.luminance() > 0.5f) Color(0xFF111111) else Color.White
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier.fillMaxWidth(),
     ) {
-        labels.forEach { (id, label) ->
-            Tab(
-                selected = id == selected,
-                onClick = { onSelect(id) },
-                text = { Text(stringResource(label), style = MaterialTheme.typography.titleSmall) },
-            )
+        androidx.compose.foundation.layout.Row(
+            Modifier.padding(6.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+        ) {
+            labels.forEach { (id, label) ->
+                val on = id == selected
+                androidx.compose.material3.Surface(
+                    onClick = { onSelect(id) },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+                    color = if (on) ink else Color.Transparent,
+                ) {
+                    Text(
+                        stringResource(label),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                        color = if (on) paper else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                    )
+                }
+            }
         }
     }
 }

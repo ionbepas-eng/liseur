@@ -2310,4 +2310,14 @@
     <string name="liburu_dc_add">Add to my library</string>
     <string name="liburu_dc_in_library">In your library</string>
     <string name="liburu_dc_retry">Retry</string>
+    <string name="liburu_lib_comics">Comics</string>
+    <string name="liburu_lib_refresh">Refresh</string>
+    <string name="liburu_lib_search">Search by title, author or series</string>
+    <string name="liburu_st_all">All</string>
+    <string name="liburu_lib_to_read">To read</string>
+    <string name="liburu_lib_finished">Finished</string>
+    <string name="liburu_lib_group_series">Group series</string>
+    <string name="liburu_lib_count_of">%1$d of %2$d books</string>
+    <string name="liburu_lib_count">%1$d books</string>
+    <string name="liburu_lib_add">Add</string>
 </resources>

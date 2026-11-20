@@ -54,6 +54,9 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
                         continue
                     }
                     if (!name.lowercase().let { it.endsWith(".epub") || it.endsWith(".cbz") }) continue
+                    if (name.lowercase().endsWith(".cbz")) {
+                        com.chmouel.liseur.ui.library.LiburuComics.mark("${com.chmouel.liseur.data.remote.ServerKind.DRIVE.urlPrefix}:" + f.getString("id"))
+                    }
                     books += book(f)
                 }
                 if (books.isNotEmpty()) onPage(books)

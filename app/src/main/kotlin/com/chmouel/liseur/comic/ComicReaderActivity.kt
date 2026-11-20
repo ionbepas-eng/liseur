@@ -90,6 +90,7 @@ class ComicReaderActivity : ComponentActivity() {
         enableEdgeToEdge()
         val uri = intent.getStringExtra(EXTRA_FILE)?.toUri() ?: return finish()
         bookId = intent.getStringExtra(EXTRA_ID) ?: uri.toString()
+        com.chmouel.liseur.ui.library.LiburuComics.mark(bookId)
         val prefs = getSharedPreferences("comics", Context.MODE_PRIVATE)
         page = prefs.getInt("page:$bookId", 0)
         var loaded by mutableStateOf(false)

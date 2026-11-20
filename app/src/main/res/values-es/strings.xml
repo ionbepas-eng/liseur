@@ -2236,4 +2236,14 @@
     <string name="liburu_dc_add">Añadir a mi biblioteca</string>
     <string name="liburu_dc_in_library">En tu biblioteca</string>
     <string name="liburu_dc_retry">Reintentar</string>
+    <string name="liburu_lib_comics">Cómics</string>
+    <string name="liburu_lib_refresh">Actualizar</string>
+    <string name="liburu_lib_search">Buscar por título, autor o serie</string>
+    <string name="liburu_st_all">Todos</string>
+    <string name="liburu_lib_to_read">Por leer</string>
+    <string name="liburu_lib_finished">Terminados</string>
+    <string name="liburu_lib_group_series">Agrupar series</string>
+    <string name="liburu_lib_count_of">%1$d de %2$d libros</string>
+    <string name="liburu_lib_count">%1$d libros</string>
+    <string name="liburu_lib_add">Añadir</string>
 </resources>

@@ -354,7 +354,24 @@ fun LiseurTheme(
                 androidx.compose.ui.Modifier
                     .fillMaxSize()
                     .background(androidx.compose.ui.graphics.Brush.verticalGradient(wall.colors)),
-            ) { content() }
+            ) {
+                if (wall.key == LiburuAppearance.IMAGE) {
+                    val v by LiburuAppearance.imageVersion.collectAsState()
+                    val file = LiburuAppearance.imageFile(context)
+                    if (file.exists()) {
+                        coil3.compose.AsyncImage(
+                            model = remember(v) { coil3.request.ImageRequest.Builder(context).data(file).memoryCacheKey("wall-$v").diskCacheKey("wall-$v").build() },
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                        )
+                        androidx.compose.foundation.layout.Box(
+                            androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFFF5F1E6).copy(alpha = LiburuAppearance.dim())),
+                        )
+                    }
+                }
+                content()
+            }
         }
     }
     }

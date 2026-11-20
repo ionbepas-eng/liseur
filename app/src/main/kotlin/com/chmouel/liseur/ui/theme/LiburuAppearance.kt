@@ -62,7 +62,31 @@ object LiburuAppearance {
     fun setBackground(key: String?) = update(_look.value.copy(background = key))
     fun setAccent(key: String) = update(_look.value.copy(accent = key))
     fun setWallpaper(key: String?) = update(_look.value.copy(wallpaper = key))
-    fun wallpaper(look: LiburuLook): LiburuWallpaper? = wallpapers.firstOrNull { it.key == look.wallpaper }
+    fun wallpaper(look: LiburuLook): LiburuWallpaper? =
+        if (look.wallpaper == IMAGE) IMAGE_WALL else wallpapers.firstOrNull { it.key == look.wallpaper }
+
+    /** «Tu imagen»: a photo from the gallery, kept on this device only (as on the web). */
+    const val IMAGE = "image"
+    private val IMAGE_WALL = LiburuWallpaper(IMAGE, listOf(Color(0xFFF1ECE4), Color(0xFFE6DED3)), false)
+    val imageVersion = MutableStateFlow(0)
+    fun imageFile(context: Context) = java.io.File(context.applicationContext.filesDir, "liburu-wall.jpg")
+    fun dim(): Float = prefs?.getFloat("wallDim", 0.25f) ?: 0.25f
+    fun setDim(v: Float) { prefs?.edit()?.putFloat("wallDim", v)?.apply(); imageVersion.value++ }
+
+    /** Copies the chosen photo in (at most 1600 px wide) and makes it the wallpaper. */
+    fun setImage(context: Context, uri: android.net.Uri): Boolean = runCatching {
+        val cr = context.contentResolver
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= 1600) sample *= 2
+        val bmp = cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) }
+            ?: return false
+        imageFile(context).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+        imageVersion.value++
+        setWallpaper(IMAGE)
+        true
+    }.getOrDefault(false)
 
     private fun update(look: LiburuLook, at: Long = System.currentTimeMillis()) {
         _look.value = look
@@ -79,7 +103,7 @@ object LiburuAppearance {
             LiburuLook(
                 background = bg?.takeIf { key -> backgrounds.any { it.first == key } },
                 accent = accent?.takeIf { key -> accents.any { it.first == key } } ?: "rosa",
-                wallpaper = wall?.takeIf { key -> wallpapers.any { it.key == key } },
+                wallpaper = wall?.takeIf { key -> key == IMAGE || wallpapers.any { it.key == key } },
             ),
             at,
         )

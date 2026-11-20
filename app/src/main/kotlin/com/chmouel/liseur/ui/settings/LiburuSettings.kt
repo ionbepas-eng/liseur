@@ -35,6 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
 import kotlinx.coroutines.launch
 import com.chmouel.liseur.container
@@ -79,6 +81,37 @@ internal fun LiburuSettings() {
                         LiburuAppearance.setWallpaper(wall.key)
                     }
                 }
+                // «Tu imagen»: a photo from the gallery, on this device only.
+                val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+                    if (uri != null && !LiburuAppearance.setImage(context, uri)) android.widget.Toast.makeText(context, "No he podido abrir esa imagen", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                val v by LiburuAppearance.imageVersion.collectAsState()
+                val file = LiburuAppearance.imageFile(context)
+                val shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                val selected = look.wallpaper == LiburuAppearance.IMAGE
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(68.dp).clickable {
+                    pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) {
+                    Box(
+                        Modifier.size(width = 60.dp, height = 84.dp)
+                            .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+                            .padding(if (selected) 4.dp else 1.dp)
+                            .clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (file.exists()) coil3.compose.AsyncImage(
+                            model = remember(v) { coil3.request.ImageRequest.Builder(context).data(file).memoryCacheKey("wallthumb-$v").build() },
+                            contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                        ) else Text("＋", style = MaterialTheme.typography.headlineMedium)
+                    }
+                    Text("Tu imagen", style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal), maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            if (look.wallpaper == LiburuAppearance.IMAGE) {
+                var dim by remember { mutableStateOf(LiburuAppearance.dim()) }
+                Text("Atenuar la imagen", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.Slider(dim, { dim = it; LiburuAppearance.setDim(it) }, valueRange = 0f..0.75f)
+                Text("«Tu imagen» se guarda solo en este dispositivo. Tócala de nuevo para cambiarla.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
                 stringResource(R.string.liburu_accent),
@@ -276,11 +309,11 @@ private fun Swatch(color: Color?, label: String, selected: Boolean, onClick: () 
     val ring = MaterialTheme.colorScheme.primary
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(64.dp).clickable(onClick = onClick),
+        modifier = Modifier.width(56.dp).clickable(onClick = onClick),
     ) {
         Box(
             Modifier
-                .size(48.dp)
+                .size(40.dp)
                 .border(if (selected) 3.dp else 1.dp, if (selected) ring else MaterialTheme.colorScheme.outlineVariant, CircleShape)
                 .padding(if (selected) 5.dp else 1.dp)
                 .background(color ?: MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
@@ -300,11 +333,11 @@ private fun Swatch(color: Color?, label: String, selected: Boolean, onClick: () 
 
 @Composable
 private fun WallpaperSwatch(colors: List<Color>?, label: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp).clickable(onClick = onClick)) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(68.dp).clickable(onClick = onClick)) {
         Box(
             Modifier
-                .size(width = 76.dp, height = 104.dp)
+                .size(width = 60.dp, height = 84.dp)
                 .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
                 .padding(if (selected) 4.dp else 1.dp)
                 .background(

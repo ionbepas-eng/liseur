@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.chmouel.liseur.R
 import com.chmouel.liseur.container
@@ -126,41 +127,23 @@ fun DiscoverScreen(
                 Avatar(Modifier.size(56.dp))
             }
         }
-        if (picks.isNotEmpty()) {
-            item { Section(R.string.liburu_dc_next, R.string.liburu_dc_next_sub) }
-            item { LibraryRow(picks, onOpenBook) }
+        if (picks.isNotEmpty()) item(key = "picks") {
+            Band { Header(stringResource(R.string.liburu_dc_next), stringResource(R.string.liburu_dc_next_sub)); LibraryRow(picks, onOpenBook) }
         }
-        if (series.isNotEmpty()) {
-            item { Section(R.string.liburu_dc_series, R.string.liburu_dc_series_sub) }
-            item { LibraryRow(series, onOpenBook) }
+        if (series.isNotEmpty()) item(key = "series") {
+            Band { Header(stringResource(R.string.liburu_dc_series), stringResource(R.string.liburu_dc_series_sub)); LibraryRow(series, onOpenBook) }
         }
         netRows?.forEach { row ->
-            item(key = "net:" + row.title) {
-                Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 14.dp)) {
-                    Text(row.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text(row.sub, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-                }
-            }
-            item(key = "netrow:" + row.title) { ExtRow(row.items) { ext = it } }
+            item(key = "net:" + row.title) { Band { Header(row.title, row.sub); ExtRow(row.items) { ext = it } } }
         }
         if (netRows == null) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { BusyIndicator() } }
-        if (wish.isNotEmpty()) {
-            item(key = "wish") {
-                Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 14.dp).clickable { wishOpen = true }, verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Me interesa ›", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Tu lista de deseos", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            item(key = "wishrow") { ExtRow(wish.map { w -> wishToExt(w) }) { ext = it } }
-        }
-        item { Section(R.string.liburu_dc_classics, R.string.liburu_dc_classics_sub) }
-        LiburuClassics.SOURCES.forEach { source ->
-            item(key = "src:" + source.key) {
-                ClassicsRow(source) { openList = source.key }
+        if (wish.isNotEmpty()) item(key = "wish") {
+            Band {
+                Box(Modifier.clickable { wishOpen = true }) { Header("Me interesa ›", "Tu lista de deseos") }
+                ExtRow(wish.map { w -> wishToExt(w) }) { ext = it }
             }
         }
+        item(key = "classics") { ClassicsSection() }
         item { LiburuNewsRow(Modifier.padding(top = 24.dp)) }
     }
 }
@@ -200,6 +183,108 @@ private fun suggestions(
     return picks.values.take(15) to series
 }
 
+/** One recommendation row on its own band, as the web lays them out. */
+@Composable
+private fun Band(content: @Composable () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 16.dp)
+            .background(Color.White.copy(alpha = 0.3f))
+            .padding(top = 20.dp, bottom = 22.dp),
+    ) { content() }
+}
+
+@Composable
+private fun Header(title: String, sub: String?) {
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineMedium)
+        sub?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp)) }
+    }
+}
+
+/** «Clásicos gratis» as on the web: the source, a search box and the list, each with «Añadir a mi biblioteca». */
+@Composable
+private fun ClassicsSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sourceKey by rememberSaveable { mutableStateOf(LiburuClassics.SOURCES.first().key) }
+    val source = LiburuClassics.byKey(sourceKey)
+    var query by rememberSaveable { mutableStateOf("") }
+    var asked by rememberSaveable { mutableStateOf("") }
+    var attempt by remember { mutableStateOf(0) }
+    val books by produceState<List<RemoteBook>?>(null, sourceKey, asked, attempt) {
+        value = null
+        value = LiburuClassics.search(context, source, asked)
+    }
+    val serverId by produceState<Long?>(null, sourceKey) { value = LiburuClassics.serverId(context, source.catalog) }
+    val owned by remember(serverId) {
+        serverId?.let { context.container.browseCatalog.observeOwned(it) } ?: flowOf(emptyMap())
+    }.collectAsState(emptyMap())
+    val ink = MaterialTheme.colorScheme.onSurface
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.liburu_dc_classics), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.liburu_dc_classics_sub), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.55f)) {
+            Row(Modifier.padding(4.dp)) {
+                LiburuClassics.SOURCES.forEach { src ->
+                    val on = src.key == sourceKey
+                    Surface(onClick = { sourceKey = src.key }, shape = RoundedCornerShape(50), color = if (on) ink else Color.Transparent) {
+                        Text(src.name, style = MaterialTheme.typography.bodyLarge, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (on) onInk() else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp))
+                    }
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.OutlinedTextField(
+                query, { query = it }, singleLine = true, modifier = Modifier.weight(1f),
+                placeholder = { Text("Busca un título o autor (vacío: los más leídos)", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                shape = RoundedCornerShape(14.dp),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { asked = query.trim() }),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color.White.copy(alpha = 0.55f), focusedContainerColor = Color.White.copy(alpha = 0.7f)),
+            )
+            Button(onClick = { asked = query.trim() }, colors = ButtonDefaults.buttonColors(containerColor = ink, contentColor = onInk())) { Text("Buscar") }
+        }
+        when (val list = books) {
+            null -> Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) { BusyIndicator() }
+            else -> if (list.isEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (asked.isNotBlank()) "Sin resultados en ${source.name}." else stringResource(R.string.liburu_dc_unreachable), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.liburu_dc_retry)) }
+                }
+            } else list.forEach { b ->
+                val state = owned[b.remoteId]?.state
+                Surface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.45f), border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(14.dp)) {
+                        RemoteCover(source, b, Modifier.width(76.dp).aspectRatio(2f / 3f))
+                        Column(Modifier.padding(start = 14.dp).weight(1f)) {
+                            Text(b.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(listOfNotNull(b.author, b.metadata?.published?.take(4)).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+                            b.metadata?.description?.let { d ->
+                                Text(d.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim(), style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { serverId?.let { id -> scope.launch { context.container.browseCatalog.add(id, listOf(b)) } } },
+                                enabled = state == null || state == BrowseOwnedState.FAILED,
+                                colors = ButtonDefaults.buttonColors(containerColor = ink, contentColor = onInk()),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            ) {
+                                when (state) {
+                                    BrowseOwnedState.IN_LIBRARY -> { Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.liburu_dc_in_library)) }
+                                    BrowseOwnedState.QUEUED, BrowseOwnedState.DOWNLOADING -> { BusyIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.download_in_progress)) }
+                                    else -> { Icon(Icons.Outlined.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.liburu_dc_add)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Section(title: Int, sub: Int?) {
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 14.dp)) {
@@ -212,7 +297,7 @@ private fun Section(title: Int, sub: Int?) {
 private fun LibraryRow(picks: List<Pick>, onOpen: (Book) -> Unit) {
     LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         items(picks, key = { it.book.url }) { p ->
-            Column(Modifier.width(132.dp).clickable { onOpen(p.book) }) {
+            Column(Modifier.width(128.dp).clickable { onOpen(p.book) }) {
                 BookCover(p.book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
                 Text(p.book.displayTitle, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                 Text(p.why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)

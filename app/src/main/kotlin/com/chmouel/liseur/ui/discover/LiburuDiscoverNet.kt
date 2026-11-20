@@ -40,7 +40,40 @@ object LiburuDiscoverNet {
             .getOrElse { all.optJSONObject(key)?.optJSONArray("v") ?: JSONArray() }
     }
 
-    private fun gb(q: String, orderBy: String = "relevance", max: Int = 20): JSONArray {
+    /** Google Books without a key runs out of its shared quota; Open Library then answers instead. */
+    private fun gb(q: String, orderBy: String = "relevance", max: Int = 20): JSONArray =
+        runCatching { gbOnly(q, orderBy, max) }.getOrNull()?.takeIf { it.length() > 0 } ?: ol(q, orderBy, max)
+
+    private fun ol(q: String, orderBy: String, max: Int): JSONArray {
+        val author = Regex("inauthor:\"([^\"]+)\"").find(q)?.groupValues?.get(1)
+        val subject = Regex("subject:(?:\"([^\"]+)\"|(\\S+))").find(q)?.groupValues?.let { it[1].ifEmpty { it[2] } }
+        val rest = q.replace(Regex("(inauthor|subject):(\"[^\"]*\"|\\S+)"), " ").trim()
+        val b = "https://openlibrary.org/search.json".toHttpUrl().newBuilder()
+            .addQueryParameter("limit", "$max").addQueryParameter("fields", "key,title,author_name,first_publish_year,cover_i")
+        when {
+            author != null -> b.addQueryParameter("author", author).addQueryParameter("sort", if (orderBy == "newest") "new" else "rating")
+            else -> b.addQueryParameter("q", listOfNotNull(subject?.let { "subject:\"${it.trim()}\"" }, rest.takeIf { it.isNotBlank() }).joinToString(" ")).addQueryParameter("sort", "rating")
+        }
+        val docs = http.newCall(Request.Builder().url(b.build()).build()).execute().use { r ->
+            if (!r.isSuccessful) throw java.io.IOException("ol ${r.code}")
+            JSONObject(r.body.string()).optJSONArray("docs") ?: JSONArray()
+        }
+        val out = JSONArray()
+        for (i in 0 until docs.length()) {
+            val d = docs.getJSONObject(i)
+            val cover = d.optLong("cover_i").takeIf { it > 0 } ?: continue
+            out.put(
+                JSONObject().put("key", "ol:" + d.optString("key")).put("title", d.optString("title"))
+                    .put("author", d.optJSONArray("author_name")?.optString(0).orEmpty())
+                    .put("date", d.optInt("first_publish_year").takeIf { it > 0 }?.toString().orEmpty())
+                    .put("cover", "https://covers.openlibrary.org/b/id/$cover-M.jpg")
+                    .put("link", "https://openlibrary.org" + d.optString("key")).put("desc", ""),
+            )
+        }
+        return out
+    }
+
+    private fun gbOnly(q: String, orderBy: String = "relevance", max: Int = 20): JSONArray {
         val url = "https://www.googleapis.com/books/v1/volumes".toHttpUrl().newBuilder().addQueryParameter("q", q)
             .addQueryParameter("maxResults", "$max").addQueryParameter("printType", "books").addQueryParameter("orderBy", orderBy).build()
         val items = http.newCall(Request.Builder().url(url).build()).execute().use { r ->
@@ -100,8 +133,11 @@ object LiburuDiscoverNet {
             finished.sortedByDescending { it.finishedAt ?: 0L }.take(2)
         }
         for (b in fav) {
-            val cat = b.url.takeIf { it.startsWith("gdrive:") }?.let { LiburuCovers.genres(it.removePrefix("gdrive:")) }
-                ?.optJSONArray("c")?.optString(0)?.split("/")?.first()?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            // The genre as the web takes it: Google Books' first category, else the file's own subjects.
+            val cat = (com.chmouel.liseur.ui.library.LiburuEnrich.get(context, b.url)?.optJSONObject("gb")?.optJSONArray("categories")?.optString(0)?.takeIf { it.isNotBlank() }
+                ?: b.url.takeIf { it.startsWith("gdrive:") }?.let { LiburuCovers.genres(it.removePrefix("gdrive:")) }?.optJSONArray("c")?.optString(0)
+                ?: b.url.takeIf { it.startsWith("gdrive:") }?.let { com.chmouel.liseur.data.gdrive.LiburuPeek.of(it.removePrefix("gdrive:")) }?.optJSONArray("subjects")?.optString(0))
+                ?.split("/")?.first()?.trim()?.takeIf { it.isNotEmpty() } ?: continue
             val items = notOwned(toExt(cached(context, "cat:$cat") { gb("subject:\"$cat\"", max = 15) }, "Porque leíste ${b.title}")).take(14)
             if (items.isNotEmpty()) out += Row("Porque te gustó ${b.title}", "Libros sobre los mismos temas", items)
         }

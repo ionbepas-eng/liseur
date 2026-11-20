@@ -57,6 +57,19 @@ object LiburuClassics {
         return found
     }
 
+    /** The source's own search (OPDS), or its most read when [q] is blank. */
+    suspend fun search(context: Context, row: Source, q: String): List<RemoteBook> {
+        if (q.isBlank()) return books(context, row)
+        val id = serverId(context, row.catalog) ?: return emptyList()
+        val enc = java.net.URLEncoder.encode(q.trim(), "UTF-8")
+        val url = when (row.catalog) {
+            FreeCatalog.TEXTOS_INFO -> "https://www.textos.info/busqueda.atom?query=$enc"
+            else -> "https://www.gutenberg.org/ebooks/search.opds/?query=$enc"
+        }
+        return runCatching { context.container.browseCatalog.listing(id, categoryId = url).books.filter { it.downloadHref != null }.distinctBy { it.remoteId }.take(20) }
+            .getOrDefault(emptyList())
+    }
+
     fun coverUrl(source: FreeCatalog, book: RemoteBook): String? {
         val href = book.coverHref ?: return null
         return source.address.toHttpUrlOrNull()?.resolve(href)?.toString() ?: href

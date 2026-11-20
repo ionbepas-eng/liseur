@@ -70,7 +70,7 @@ object LiburuShelves {
 
     fun saveShelf(context: Context, id: String?, name: String, deleted: Boolean = false): String {
         val p = pending(context)
-        val shelfId = id ?: ("s" + System.currentTimeMillis().toString(36))
+        val shelfId = id ?: ("s" + System.currentTimeMillis().toString(36) + (0..1295).random().toString(36))
         p.getJSONObject("shelves").put(
             shelfId,
             JSONObject().put("id", shelfId).put("name", name).put("t", System.currentTimeMillis()).put("deleted", deleted),

@@ -49,6 +49,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.chmouel.liseur.data.db.Book
+import com.chmouel.liseur.container
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
 
 /** Liburuville's shelves: the list, one shelf's books, and adding books to it. */
 @Composable
@@ -68,49 +71,48 @@ internal fun ShelvesOverview(
 
     val open = shelves.firstOrNull { it.id == openId }
     if (open == null) {
-        LazyColumn(
+        var organizing by remember { mutableStateOf(false) }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(170.dp),
             modifier = modifier,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomInset + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = bottomInset + 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item {
-                FilledTonalButton(onClick = { naming = null to "" }) {
-                    Icon(Icons.Outlined.Add, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Nueva estantería")
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    androidx.compose.material3.Button(
+                        onClick = { organizing = true },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface),
+                    ) { Text("✨ " + androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_organize), fontWeight = FontWeight.SemiBold) }
+                    androidx.compose.material3.OutlinedButton(onClick = { naming = null to "" }) {
+                        Icon(Icons.Outlined.Add, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_new), fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
             if (shelves.isEmpty()) {
-                item {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                     Text(
-                        "Crea estanterías para agrupar tus libros (por ejemplo «Clásicos» o «Cine»). Son las mismas que en Liburuville web.",
+                        androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 16.dp),
                     )
                 }
             }
-            items(shelves, key = { it.id }) { shelf ->
+            items(shelves.sortedBy { it.name.lowercase() }, key = { it.id }) { shelf ->
                 val on = booksOn(shelf.id)
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(20.dp),
-                    modifier = Modifier.fillMaxWidth().clickable { openId = shelf.id },
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(shelf.name, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
-                            Text("${on.size} ${if (on.size == 1) "libro" else "libros"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (on.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                on.take(5).forEach { BookCover(it, Modifier.width(52.dp).aspectRatio(2f / 3f), RoundedCornerShape(6.dp)) }
-                            }
-                        }
-                    }
-                }
+                FanCard(
+                    books = on,
+                    title = shelf.name,
+                    subtitle = androidx.compose.ui.res.pluralStringResource(com.chmouel.liseur.R.plurals.liburu_n_books, on.size, on.size),
+                    onClick = { openId = shelf.id },
+                )
             }
         }
+        if (organizing) OrganizeDialog(books) { organizing = false }
     } else {
         val on = booksOn(open.id)
         Column(modifier) {
@@ -195,4 +197,103 @@ internal fun ShelvesOverview(
             dismissButton = { TextButton(onClick = { naming = null }) { Text("Cancelar") } },
         )
     }
+}
+
+/** A card as on the web: up to three covers fanned out on a grey band, then the name. */
+@Composable
+internal fun FanCard(books: List<Book>, title: String, subtitle: String, onClick: () -> Unit, onEdit: (() -> Unit)? = null) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    ) {
+        Column {
+            Box(
+                Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                val shown = books.take(3)
+                val order = when (shown.size) { 3 -> listOf(0, 2, 1); else -> shown.indices.toList() }
+                order.forEach { i ->
+                    val side = when {
+                        shown.size == 1 -> 0
+                        shown.size == 2 -> if (i == 0) -1 else 1
+                        else -> i - 1
+                    }
+                    BookCover(
+                        shown[i],
+                        Modifier
+                            .padding(top = 18.dp)
+                            .width(if (side == 0) 74.dp else 66.dp)
+                            .aspectRatio(2f / 3f)
+                            .graphicsLayer {
+                                translationX = side * 34.dp.toPx()
+                                rotationZ = side * 6f
+                                translationY = if (side == 0) 0f else 6.dp.toPx()
+                            },
+                    )
+                }
+            }
+            Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                onEdit?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Edit, androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_wf_edit)) } }
+            }
+        }
+    }
+}
+
+/** «Organizar automáticamente»: the web's proposal, shelf by shelf, then applied. */
+@Composable
+private fun OrganizeDialog(books: List<Book>, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val proposal by androidx.compose.runtime.produceState<Map<String, List<String>>?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { LiburuAutoShelves.propose(context, books) }
+    }
+    var chosen by remember { mutableStateOf(LiburuAutoShelves.autoNames(context)) }
+    var result by remember { mutableStateOf<Int?>(null) }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_organize)) },
+        text = {
+            val p = proposal
+            when {
+                result != null -> Text(androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_done, result!!))
+                p == null -> com.chmouel.liseur.ui.BusyIndicator()
+                else -> Column {
+                    Text(
+                        androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_explain),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    LazyColumn(Modifier.height(360.dp).padding(top = 8.dp)) {
+                        items(p.entries.filter { it.value.isNotEmpty() }.toList(), key = { it.key }) { (name, urls) ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { chosen = if (name in chosen) chosen - name else chosen + name },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(name in chosen, null)
+                                Text(name, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                                Text("${urls.size}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (result == null) {
+                TextButton(enabled = proposal != null && chosen.isNotEmpty(), onClick = {
+                    val p = proposal ?: return@TextButton
+                    result = LiburuAutoShelves.apply(context, p, chosen)
+                    context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                }) { Text(androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_sh_apply)) }
+            } else {
+                TextButton(onClick = onDone) { Text(androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_bd_close)) }
+            }
+        },
+        dismissButton = { if (result == null) TextButton(onClick = onDone) { Text(androidx.compose.ui.res.stringResource(android.R.string.cancel)) } },
+    )
 }

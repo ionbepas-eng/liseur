@@ -1008,7 +1008,7 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
             .replace(Regex("[^a-z0-9]+"), "-").trim('-')
         "https://www.ivoox.com/${slug}_sb.html?sb=${enc(x.trim())}"
     }
-    val groups = listOf(
+    val defaults = listOf(
         R.string.liburu_wf_buy to listOf(
             "Play Libros" to "https://play.google.com/store/search?q=$q&c=books",
             "Kobo" to "https://www.kobo.com/es/es/search?query=$q",
@@ -1039,11 +1039,31 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
                 (if (a.isNotBlank()) listOf("Spotify · el autor" to "https://open.spotify.com/search/${enc(a)}/episodes", "iVoox · el autor" to ivoox(a)) else emptyList())
             ),
         R.string.liburu_wf_videos to (if (a.isNotBlank()) listOf("Entrevistas del autor en YouTube" to "https://www.youtube.com/results?search_query=${enc("$a entrevista")}") else emptyList()),
-    ).filter { it.second.isNotEmpty() }
+    )
+    val linksVersion by WhereLinks.version.collectAsState()
+    val fill = { tpl: String ->
+        tpl.replace("{q}", q).replace("{t}", enc(t)).replace("{a}", enc(a)).replace("{isbn}", isbn.orEmpty())
+    }
+    val groups = remember(linksVersion, t, a) {
+        defaults.map { (label, links) ->
+            val key = WhereLinks.keyOf(label)
+            val hidden = WhereLinks.hidden(context, key)
+            label to (links.filter { it.first !in hidden } + WhereLinks.custom(context, key).map { it.first to fill(it.second) })
+        }.filter { it.second.isNotEmpty() }
+    }
+    var editingGroup by remember { mutableStateOf<Int?>(null) }
     Column(modifier) {
         SectionTitle(stringResource(R.string.liburu_bd_where))
         groups.forEach { (label, links) ->
-            Text(stringResource(label), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp, bottom = 10.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(label), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.liburu_wf_edit),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { editingGroup = label },
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 links.forEach { (name, url) ->
                     Surface(
@@ -1058,4 +1078,83 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
             }
         }
     }
+    editingGroup?.let { label ->
+        WhereLinksDialog(label, defaults.first { it.first == label }.second.map { it.first }) { editingGroup = null }
+    }
+}
+
+/** The reader's changes to «Dónde encontrarlo»: links hidden and links added, per group. */
+object WhereLinks {
+    val version = kotlinx.coroutines.flow.MutableStateFlow(0)
+    private fun prefs(c: android.content.Context) = c.getSharedPreferences("liburu", android.content.Context.MODE_PRIVATE)
+    private fun all(c: android.content.Context) = runCatching { JSONObject(prefs(c).getString("whereLinks", "{}")!!) }.getOrDefault(JSONObject())
+    fun keyOf(label: Int) = when (label) {
+        R.string.liburu_wf_buy -> "buy"; R.string.liburu_wf_audio -> "audio"; R.string.liburu_wf_free -> "free"
+        R.string.liburu_wf_communities -> "communities"; R.string.liburu_wf_reviews -> "reviews"; R.string.liburu_wf_podcasts -> "podcasts"
+        else -> "videos"
+    }
+    fun hidden(c: android.content.Context, key: String): Set<String> =
+        all(c).optJSONObject(key)?.optJSONArray("hidden")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }.orEmpty()
+    fun custom(c: android.content.Context, key: String): List<Pair<String, String>> =
+        all(c).optJSONObject(key)?.optJSONArray("custom")?.let { a -> (0 until a.length()).map { a.getJSONObject(it).let { o -> o.optString("n") to o.optString("u") } } }.orEmpty()
+    fun save(c: android.content.Context, key: String, hidden: Set<String>, custom: List<Pair<String, String>>) {
+        val root = all(c).put(key, JSONObject()
+            .put("hidden", org.json.JSONArray(hidden.toList()))
+            .put("custom", org.json.JSONArray(custom.map { JSONObject().put("n", it.first).put("u", it.second) })))
+        prefs(c).edit().putString("whereLinks", root.toString()).putLong("whereLinksT", System.currentTimeMillis()).apply()
+        version.value++
+    }
+}
+
+@Composable
+private fun WhereLinksDialog(label: Int, defaultNames: List<String>, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val key = WhereLinks.keyOf(label)
+    var hidden by remember { mutableStateOf(WhereLinks.hidden(context, key)) }
+    var custom by remember { mutableStateOf(WhereLinks.custom(context, key)) }
+    var newName by remember { mutableStateOf("") }
+    var newUrl by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(stringResource(label)) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 460.dp)) {
+                items(defaultNames) { n ->
+                    Row(Modifier.fillMaxWidth().clickable { hidden = if (n in hidden) hidden - n else hidden + n }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(n !in hidden, null)
+                        Text(n, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+                items(custom) { (n, u) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(n)
+                            Text(u, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        IconButton(onClick = { custom = custom - (n to u) }) { Icon(Icons.Outlined.Close, stringResource(R.string.liburu_wf_remove)) }
+                    }
+                }
+                item {
+                    Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(stringResource(R.string.liburu_wf_add), style = MaterialTheme.typography.titleSmall)
+                        OutlinedTextField(newName, { newName = it }, label = { Text(stringResource(R.string.liburu_wf_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(newUrl, { newUrl = it }, label = { Text(stringResource(R.string.liburu_wf_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Text(stringResource(R.string.liburu_wf_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(
+                            enabled = newName.isNotBlank() && newUrl.startsWith("http"),
+                            onClick = { custom = custom + (newName.trim() to newUrl.trim()); newName = ""; newUrl = "" },
+                        ) { Text(stringResource(R.string.liburu_wf_add_btn)) }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                WhereLinks.save(context, key, hidden, custom)
+                context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                onDone()
+            }) { Text(stringResource(R.string.liburu_bd_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text(stringResource(android.R.string.cancel)) } },
+    )
 }

@@ -1185,6 +1185,8 @@ fun LibraryScreen(
                     }
 
                     showSeries -> SeriesOverview(
+                        onSetSeries = onSetSeries,
+                        onResetSeries = onResetSeries,
                         series = state.seriesTabSeries,
                         downloads = state.downloads,
                         listState = seriesState,

@@ -2344,4 +2344,28 @@
     <string name="liburu_wf_reviews">Reviews elsewhere</string>
     <string name="liburu_wf_podcasts">Podcasts</string>
     <string name="liburu_wf_videos">Videos</string>
+    <string name="liburu_sh_organize">Organise automatically</string>
+    <string name="liburu_sh_new">New shelf</string>
+    <string name="liburu_sh_empty">Create shelves to group your books (for example “Classics” or “Film”). They are the same as on Liburuville web.</string>
+    <string name="liburu_sh_explain">Each book goes to the shelves its genres, title, author and year point to. No book is taken off a shelf; new books will be placed on their own.</string>
+    <string name="liburu_sh_apply">Organise</string>
+    <string name="liburu_sh_done">%1$d places on shelves added.</string>
+    <plurals name="liburu_n_books">
+        <item quantity="one">%d book</item>
+        <item quantity="other">%d books</item>
+    </plurals>
+    <string name="liburu_wf_edit">Edit</string>
+    <string name="liburu_wf_remove">Remove</string>
+    <string name="liburu_wf_add">Add a link</string>
+    <string name="liburu_wf_name">Name</string>
+    <string name="liburu_wf_url">Address</string>
+    <string name="liburu_wf_help">In the address, {t} is the title, {a} the author, {q} both and {isbn} the ISBN.</string>
+    <string name="liburu_wf_add_btn">Add</string>
+    <string name="liburu_se_hide_singles">Hide one-book series (%1$d)</string>
+    <string name="liburu_se_hint">To join, rename or undo a series, tap the pencil on its card.</string>
+    <string name="liburu_se_read">%1$s · %2$d read</string>
+    <string name="liburu_se_edit_title">Edit series</string>
+    <string name="liburu_se_edit_explain">Rename it, or type the name of another series to join them. Undo puts back the series each book came with.</string>
+    <string name="liburu_se_join">Join into «%1$s»</string>
+    <string name="liburu_se_undo">Undo</string>
 </resources>

@@ -90,10 +90,17 @@ class DriveStateSync(
             .put("ratings", exportRatings())
             .put("feeds", liburuPrefs.getString("feeds", null) ?: JSONObject.NULL)
             .put("feedsT", liburuPrefs.getLong("feedsT", 0L))
+            .put("whereLinks", liburuPrefs.getString("whereLinks", null) ?: JSONObject.NULL)
+            .put("whereLinksT", liburuPrefs.getLong("whereLinksT", 0L))
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
         runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
         runCatching { LiburuCovers.fill(bookDao) }.onFailure { Log.w(TAG, "covers failed", it) }
+        // New books go to the automatic shelves on their own, as on the web.
+        runCatching {
+            val placed = com.chmouel.liseur.ui.library.LiburuAutoShelves.autoAssign(app, bookDao.allOnce().filter { !it.hidden })
+            if (placed > 0) syncSharedProfile()
+        }.onFailure { Log.w(TAG, "auto shelves failed", it) }
     }
 
     /**
@@ -218,6 +225,11 @@ class DriveStateSync(
                 val book = bookDao.getByUrl(url) ?: continue
                 runCatching { dao.edit(url, field, value, book.title, book.author.orEmpty(), t) }
             }
+        }
+        val whereT = remote.optLong("whereLinksT")
+        if (whereT > liburuPrefs.getLong("whereLinksT", 0L) && !remote.isNull("whereLinks")) {
+            liburuPrefs.edit().putString("whereLinks", remote.optString("whereLinks")).putLong("whereLinksT", whereT).apply()
+            com.chmouel.liseur.ui.library.WhereLinks.version.value++
         }
         val feedsT = remote.optLong("feedsT")
         if (feedsT > liburuPrefs.getLong("feedsT", 0L) && !remote.isNull("feeds")) {

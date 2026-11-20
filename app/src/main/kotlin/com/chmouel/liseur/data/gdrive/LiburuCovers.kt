@@ -29,32 +29,55 @@ object LiburuCovers {
         runCatching { JSONObject(File(dir, FILE).readText()) }.getOrNull() ?: JSONObject()
     ).also { memo = it }
 
-    @Synchronized private fun put(id: String, url: String) {
-        val root = all().put(id, JSONObject().put("u", url).put("t", System.currentTimeMillis()))
+    @Synchronized private fun put(id: String, entry: JSONObject) {
+        val root = all().put(id, entry.put("t", System.currentTimeMillis()))
         runCatching { File(dir, FILE).writeText(root.toString()) }
     }
+
+    /** Genres, a slice of the blurb and the year Google Books gave, for the automatic shelves. */
+    fun genres(id: String): JSONObject? = all().optJSONObject(id)?.takeIf { it.optBoolean("g") }
 
     /** The cover found for Drive file [id], if any. */
     fun cached(id: String): String? = all().optJSONObject(id)?.optString("u")?.takeIf { it.isNotEmpty() }
 
-    /** Looks up to [limit] coverless Drive books; returns how many it found. */
+    /**
+     * Looks up to [limit] Drive books still missing a cover or their genres;
+     * returns how many covers it found.
+     */
     suspend fun fill(bookDao: BookDao, limit: Int = 80): Int {
         if (dir == null) return 0
         val prefix = "gdrive:"
         val now = System.currentTimeMillis()
         val todo = bookDao.allOnce().filter { b ->
-            b.url.startsWith(prefix) && b.coverPath == null && b.coverUrl.isNullOrEmpty() &&
-                all().optJSONObject(b.url.removePrefix(prefix))?.let { e ->
-                    e.optString("u").isEmpty() && now - e.optLong("t") > RETRY
-                } ?: true
+            if (!b.url.startsWith(prefix)) return@filter false
+            val e = all().optJSONObject(b.url.removePrefix(prefix))
+            val needsCover = b.coverPath == null && b.coverUrl.isNullOrEmpty()
+            when {
+                e == null -> true
+                now - e.optLong("t") < RETRY -> !e.optBoolean("g") && e.optLong("t") < now - 86_400_000L
+                else -> needsCover || !e.optBoolean("g")
+            }
         }.take(limit)
         var found = 0
         for (b in todo) {
             val id = b.url.removePrefix(prefix)
-            val url = runCatching { google(b.title, b.author) ?: openLibrary(b.title, b.author) }
-                .onFailure { Log.i("LiburuCovers", "lookup failed", it) }.getOrNull()
-            put(id, url.orEmpty())
-            if (url != null) { bookDao.setFoundCover(b.url, url); found++ }
+            val entry = JSONObject()
+            runCatching {
+                val v = google(b.title, b.author)
+                if (v != null) {
+                    entry.put("g", true)
+                        .put("c", v.optJSONArray("categories") ?: org.json.JSONArray())
+                        .put("d", v.optString("description").replace(Regex("<[^>]+>"), " ").take(700))
+                        .put("y", v.optString("publishedDate").take(4))
+                    v.optJSONObject("imageLinks")?.let { it.optString("thumbnail").ifEmpty { it.optString("smallThumbnail") } }
+                        ?.takeIf { it.isNotEmpty() }?.let { entry.put("u", it.replace("http:", "https:").replace("&edge=curl", "")) }
+                }
+                if (!entry.has("u")) openLibrary(b.title, b.author)?.let { entry.put("u", it) }
+            }.onFailure { Log.i("LiburuCovers", "lookup failed", it) }
+            if (!entry.has("u")) entry.put("u", "")
+            put(id, entry)
+            val url = entry.optString("u")
+            if (url.isNotEmpty() && b.coverPath == null && b.coverUrl.isNullOrEmpty()) { bookDao.setFoundCover(b.url, url); found++ }
             Thread.sleep(350)
         }
         return found
@@ -71,19 +94,17 @@ object LiburuCovers {
     private fun get(url: String): JSONObject? =
         http.newCall(Request.Builder().url(url).build()).execute().use { if (it.isSuccessful) JSONObject(it.body.string()) else null }
 
-    private fun google(title: String, author: String?): String? {
+    private fun google(title: String, author: String?): JSONObject? {
         val q = "intitle:\"${short(title)}\"" + (author?.split(' ')?.lastOrNull()?.takeIf { it.isNotBlank() }?.let { " inauthor:\"$it\"" } ?: "")
         val url = "https://www.googleapis.com/books/v1/volumes".toHttpUrl().newBuilder()
             .addQueryParameter("q", q).addQueryParameter("maxResults", "6").addQueryParameter("printType", "books").build()
         val items = get(url.toString())?.optJSONArray("items") ?: return null
-        for (i in 0 until items.length()) {
-            val v = items.getJSONObject(i).optJSONObject("volumeInfo") ?: continue
-            if (!same(v.optString("title"), title)) continue
-            val img = v.optJSONObject("imageLinks")?.let { it.optString("thumbnail").ifEmpty { it.optString("smallThumbnail") } }
-                ?.takeIf { it.isNotEmpty() } ?: continue
-            return img.replace("http:", "https:").replace("&edge=curl", "")
-        }
-        return null
+        val vols = (0 until items.length()).mapNotNull { items.getJSONObject(it).optJSONObject("volumeInfo") }
+            .filter { same(it.optString("title"), title) }
+        val best = vols.firstOrNull { it.has("imageLinks") } ?: vols.firstOrNull() ?: return null
+        // Genres gathered from the first matches, as the web's quickGenres does.
+        val cats = vols.take(4).flatMap { v -> v.optJSONArray("categories")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList() }.distinct()
+        return JSONObject(best.toString()).put("categories", org.json.JSONArray(cats))
     }
 
     private fun openLibrary(title: String, author: String?): String? {

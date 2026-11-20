@@ -52,6 +52,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -81,7 +85,13 @@ internal fun SeriesOverview(
     onSeriesSelected: (SeriesShelf) -> Unit,
     bottomInset: Dp,
     modifier: Modifier = Modifier,
+    onSetSeries: ((Book, String?, Double?) -> Unit)? = null,
+    onResetSeries: ((Book) -> Unit)? = null,
 ) {
+    if (!LocalEInk.current && onSetSeries != null && onResetSeries != null) {
+        LiburuSeriesGrid(series, onSeriesSelected, onSetSeries, onResetSeries, bottomInset, modifier)
+        return
+    }
     LazyColumn(
         state = listState,
         modifier = modifier,
@@ -323,5 +333,105 @@ private fun VolumeBadge(index: Double?, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(bottomEnd = 6.dp))
             .background(CoverBadgeScrim)
             .padding(horizontal = 5.dp, vertical = 1.dp),
+    )
+}
+
+/** Liburuville: the web's Series tab, fanned covers in a grid, each with «Editar». */
+@Composable
+private fun LiburuSeriesGrid(
+    series: List<SeriesShelf>,
+    onSeriesSelected: (SeriesShelf) -> Unit,
+    onSetSeries: (Book, String?, Double?) -> Unit,
+    onResetSeries: (Book) -> Unit,
+    bottomInset: Dp,
+    modifier: Modifier,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("liburu", android.content.Context.MODE_PRIVATE) }
+    var hideSingles by remember { mutableStateOf(prefs.getBoolean("hideSingleSeries", false)) }
+    var editing by remember { mutableStateOf<SeriesShelf?>(null) }
+    val singles = series.count { it.volumes.size == 1 }
+    val shown = if (hideSingles) series.filter { it.volumes.size > 1 } else series
+    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+        columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(170.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = bottomInset + 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (singles > 0) {
+                    Surface(
+                        onClick = { hideSingles = !hideSingles; prefs.edit().putBoolean("hideSingleSeries", hideSingles).apply() },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = if (hideSingles) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                        border = if (hideSingles) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        Text(
+                            stringResource(R.string.liburu_se_hide_singles, singles),
+                            color = if (hideSingles) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+                Text(stringResource(R.string.liburu_se_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        gridItems(shown, key = { "lse:" + it.key }) { shelf ->
+            val read = shelf.volumes.count { it.book.finished }
+            val count = pluralStringResource(R.plurals.liburu_n_books, shelf.volumes.size, shelf.volumes.size)
+            FanCard(
+                books = (listOfNotNull(shelf.nextUp?.book) + shelf.volumes.map { it.book }).distinctBy { it.url },
+                title = shelf.name,
+                subtitle = if (read > 0) stringResource(R.string.liburu_se_read, count, read) else count,
+                onClick = { onSeriesSelected(shelf) },
+                onEdit = { editing = shelf },
+            )
+        }
+    }
+    editing?.let { shelf -> SeriesEditDialog(shelf, series, onSetSeries, onResetSeries) { editing = null } }
+}
+
+/** Rename (or join into another series by giving its name) and undo, book by book. */
+@Composable
+private fun SeriesEditDialog(
+    shelf: SeriesShelf,
+    all: List<SeriesShelf>,
+    onSetSeries: (Book, String?, Double?) -> Unit,
+    onResetSeries: (Book) -> Unit,
+    onDone: () -> Unit,
+) {
+    var name by remember { mutableStateOf(shelf.name) }
+    val others = all.filter { it.key != shelf.key }.map { it.name }.filter { name.isNotBlank() && it.contains(name, true) && it != name }.take(4)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(stringResource(R.string.liburu_se_edit_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.liburu_se_edit_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.material3.OutlinedTextField(name, { name = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                others.forEach { o ->
+                    androidx.compose.material3.TextButton(onClick = { name = o }) { Text(stringResource(R.string.liburu_se_join, o)) }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(enabled = name.isNotBlank(), onClick = {
+                val target = name.trim()
+                val offset = all.firstOrNull { it.name.equals(target, true) && it.key != shelf.key }
+                    ?.volumes?.mapNotNull { it.book.seriesIndex }?.maxOrNull() ?: 0.0
+                shelf.volumes.forEach { v -> onSetSeries(v.book, target, v.book.seriesIndex?.let { if (offset > 0) it + offset else it }) }
+                onDone()
+            }) { Text(stringResource(R.string.liburu_bd_save)) }
+        },
+        dismissButton = {
+            Row {
+                androidx.compose.material3.TextButton(onClick = { shelf.volumes.forEach { onResetSeries(it.book) }; onDone() }) {
+                    Text(stringResource(R.string.liburu_se_undo))
+                }
+                androidx.compose.material3.TextButton(onClick = onDone) { Text(stringResource(android.R.string.cancel)) }
+            }
+        },
     )
 }

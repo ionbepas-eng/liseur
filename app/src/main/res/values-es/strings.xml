@@ -2270,4 +2270,28 @@
     <string name="liburu_wf_reviews">Opiniones en otras webs</string>
     <string name="liburu_wf_podcasts">Podcasts</string>
     <string name="liburu_wf_videos">Vídeos</string>
+    <string name="liburu_sh_organize">Organizar automáticamente</string>
+    <string name="liburu_sh_new">Nueva estantería</string>
+    <string name="liburu_sh_empty">Crea estanterías para agrupar tus libros (por ejemplo «Clásicos» o «Cine»). Son las mismas que en Liburuville web.</string>
+    <string name="liburu_sh_explain">Cada libro va a las estanterías que indican sus géneros, título, autor y año. No se quita ningún libro de una estantería; los libros nuevos se colocarán solos.</string>
+    <string name="liburu_sh_apply">Organizar</string>
+    <string name="liburu_sh_done">Se han añadido %1$d libros a estanterías.</string>
+    <plurals name="liburu_n_books">
+        <item quantity="one">%d libro</item>
+        <item quantity="other">%d libros</item>
+    </plurals>
+    <string name="liburu_wf_edit">Editar</string>
+    <string name="liburu_wf_remove">Quitar</string>
+    <string name="liburu_wf_add">Añadir un enlace</string>
+    <string name="liburu_wf_name">Nombre</string>
+    <string name="liburu_wf_url">Dirección</string>
+    <string name="liburu_wf_help">En la dirección, {t} es el título, {a} el autor, {q} ambos y {isbn} el ISBN.</string>
+    <string name="liburu_wf_add_btn">Añadir</string>
+    <string name="liburu_se_hide_singles">Ocultar series de 1 libro (%1$d)</string>
+    <string name="liburu_se_hint">Para unir, renombrar o deshacer una serie, pulsa el lápiz de su tarjeta.</string>
+    <string name="liburu_se_read">%1$s · %2$d leído</string>
+    <string name="liburu_se_edit_title">Editar serie</string>
+    <string name="liburu_se_edit_explain">Renómbrala o escribe el nombre de otra serie para unirlas. Deshacer devuelve a cada libro la serie con la que venía.</string>
+    <string name="liburu_se_join">Unir a «%1$s»</string>
+    <string name="liburu_se_undo">Deshacer</string>
 </resources>

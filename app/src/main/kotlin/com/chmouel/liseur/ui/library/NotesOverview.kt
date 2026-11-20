@@ -64,10 +64,11 @@ internal fun LibrarySections(
     }
     val ink = MaterialTheme.colorScheme.onSurface
     val paper = if (ink.luminance() > 0.5f) Color(0xFF111111) else Color.White
+    // Centred on the screen whatever its width, as Ion asked.
+    androidx.compose.foundation.layout.Box(modifier.fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
     androidx.compose.material3.Surface(
         shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.fillMaxWidth(),
     ) {
         androidx.compose.foundation.layout.Row(
             Modifier.padding(6.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
@@ -91,6 +92,7 @@ internal fun LibrarySections(
             }
         }
     }
+}
 }
 
 private enum class NotesFilter { ALL, HIGHLIGHTS, NOTES }

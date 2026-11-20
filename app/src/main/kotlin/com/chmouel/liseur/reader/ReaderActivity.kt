@@ -166,6 +166,13 @@ class ReaderActivity : FragmentActivity() {
             return
         }
 
+        // Liburuville: the book's title, for words saved to the vocabulary.
+        intent.getStringExtra(EXTRA_ID)?.let { bookId ->
+            lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                com.chmouel.liseur.data.gdrive.LiburuShared.currentBookTitle =
+                    (application as com.chmouel.liseur.LiseurApplication).container.database.bookDao().getByUrl(bookId)?.title
+            }
+        }
         // Liburuville: a CBZ goes to the comic reader instead.
         if (fromLibrary != null && com.chmouel.liseur.comic.ComicArchive.isComic(this, incoming)) {
             startActivity(

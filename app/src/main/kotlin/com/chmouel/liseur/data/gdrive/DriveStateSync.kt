@@ -180,6 +180,9 @@ class DriveStateSync(
         if (syncBooks(state)) changed = true
         val hadShelfEdits = com.chmouel.liseur.ui.library.LiburuShelves.applyPending(app, state)
         if (hadShelfEdits) changed = true
+        if (LiburuShared.mergeVocab(app, state)) changed = true
+        val hadAnn = LiburuShared.applyAnnotations(app, state)
+        if (hadAnn) changed = true
 
         // Kept for the Home level and challenges, which read the web's books, shelves and retos.
         File(app.filesDir, STATE_CACHE).writeText(state.toString())
@@ -198,6 +201,7 @@ class DriveStateSync(
             ).build()
         }
         http.newCall(request).execute().use { if (!it.isSuccessful) throw IOException("state upload ${it.code}") }
+        if (hadAnn) { LiburuShared.clearAnnotations(app); File(app.filesDir, STATE_CACHE).writeText(state.toString()); LiburuShared.version.value++ }
         if (hadShelfEdits) com.chmouel.liseur.ui.library.LiburuShelves.clearPending(app)
         // Only once the shared file is written, so a failed upload is retried with them.
         val hc = HardcoverSync(app, com.chmouel.liseur.data.remote.RemoteHttp.default())

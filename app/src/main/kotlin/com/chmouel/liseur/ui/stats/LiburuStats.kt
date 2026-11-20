@@ -80,7 +80,7 @@ private val ES = Locale("es", "ES")
 private val Gold = Color(0xFFE8B83A)
 
 /** One reading session, Android's or the web's, the way the web counts them. */
-private data class Sit(val key: String, val start: Long, val seconds: Double, val from: Double?, val to: Double?, val pages: Double?)
+private data class Sit(val key: String, val start: Long, val seconds: Double, val from: Double?, val to: Double?, val pages: Double?, val device: String = "android-here")
 
 private fun keyOf(url: String) = if (url.startsWith("gdrive:")) "g:" + url.removePrefix("gdrive:") else url
 
@@ -102,7 +102,8 @@ private class StatsData(context: Context, val books: List<Book>, android: List<R
         for (i in 0 until web.length()) {
             val o = web.optJSONObject(i) ?: continue
             sits += Sit(o.optString("bookId"), o.optLong("start"), o.optDouble("seconds", 0.0),
-                o.optDouble("fromFrac").takeIf { !it.isNaN() }, o.optDouble("toFrac").takeIf { !it.isNaN() }, o.optDouble("pages").takeIf { !it.isNaN() })
+                o.optDouble("fromFrac").takeIf { !it.isNaN() }, o.optDouble("toFrac").takeIf { !it.isNaN() }, o.optDouble("pages").takeIf { !it.isNaN() },
+                device = if (o.optBoolean("manual")) "" else o.optString("device"))
         }
         webBooks.keys().forEach { k ->
             val m = webBooks.optJSONObject(k)?.optJSONObject("meta") ?: return@forEach
@@ -683,7 +684,9 @@ private val ACHIEVEMENTS = listOf(
     Achv("pages", "Pasapáginas", "📄", listOf(1000, 5000, 10000, 25000, 50000)) { "Lee ${fmtNum(it)} páginas" },
     Achv("hours", "Horas de vuelo", "⏱", listOf(10, 50, 100, 250, 500)) { "Acumula $it horas de lectura" },
     Achv("streak", "Constancia", "🔥", listOf(7, 30, 100, 365)) { "Lee $it días seguidos" },
+    Achv("en", "Bilingüe", "🌍", listOf(1, 5, 15, 30)) { "Termina $it ${if (it == 1) "libro" else "libros"} en inglés" },
     Achv("hl", "Subrayador", "🖍", listOf(10, 100, 500)) { "Haz $it subrayados" },
+    Achv("words", "Coleccionista de palabras", "🔤", listOf(10, 100, 500)) { "Guarda $it palabras en tu vocabulario" },
     Achv("classics", "Clásico", "🏛", listOf(1, 5, 15)) { "Termina $it de tu estantería Clásicos" },
     Achv("series", "Sagas", "📚", listOf(3, 10, 25)) { "Termina $it libros que formen parte de una serie" },
     Achv("rated", "Crítico", "⭐", listOf(10, 50)) { "Califica $it libros terminados" },
@@ -695,6 +698,8 @@ private val ACHIEVEMENTS = listOf(
     Achv("fast", "Rayo", "⚡", listOf(1)) { "Termina un libro en 3 días o menos" },
     Achv("old", "Arqueólogo", "📜", listOf(1)) { "Termina un libro publicado antes de 1900" },
     Achv("perfect", "Mes perfecto", "📅", listOf(1)) { "Lee todos los días de un mes" },
+    Achv("devices", "Nómada", "📱", listOf(3)) { "Lee en 3 dispositivos distintos" },
+    Achv("retos", "Retador", "🚩", listOf(1, 6, 12)) { "Completa $it ${if (it == 1) "reto" else "retos"}" },
 )
 private val TIER_NAMES = listOf("Bronce", "Plata", "Oro", "Rubí", "Diamante")
 private val TIER_COLORS = listOf(Color(0xFFD98B5B), Color(0xFF9FB4C7), Color(0xFFE8B83A), Color(0xFFC8455F), Color(0xFF6C8FE0))
@@ -716,7 +721,11 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
         val state = runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull()
         val shelves = state?.optJSONObject("shelves")
         val classic = shelves?.keys()?.asSequence()?.filter { Regex("cl[aá]sic", RegexOption.IGNORE_CASE).containsMatchIn(shelves.optJSONObject(it)?.optString("name").orEmpty()) }?.toSet().orEmpty()
-        mapOf(
+        val lang = { k: String -> data.peek(k)?.optString("lang")?.lowercase() }
+        val webAchv = state?.optJSONObject("achv")
+        // What the web already counted (words, challenges…) is never lost here.
+        fun web(id: String) = webAchv?.optJSONObject(id)?.optInt("tier")?.takeIf { it > 0 }?.let { t -> ACHIEVEMENTS.first { it.id == id }.tiers.getOrNull(t - 1)?.toDouble() } ?: 0.0
+        val local = mapOf(
             "books" to fin.size.toDouble(),
             "pages" to pagesByBook.values.sum(),
             "hours" to data.sits.sumOf { it.seconds } / 3600,
@@ -733,7 +742,12 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
             "fast" to if (fin.any { k -> data.startedAt[k]?.let { s -> data.finishedAt.getValue(k) - s <= 3 * 86_400_000L } == true }) 1.0 else 0.0,
             "old" to if (fin.any { k -> data.year(k)?.let { it < 1900 } == true }) 1.0 else 0.0,
             "perfect" to if (perMonth.any { (m, d) -> m != now && d.size >= m.lengthOfMonth() }) 1.0 else 0.0,
+            "en" to fin.count { lang(it)?.startsWith("en") == true }.toDouble(),
+            "words" to com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context).size.toDouble(),
+            "devices" to data.sits.map { it.device }.filter { it.isNotEmpty() }.toSet().size.toDouble(),
+            "retos" to 0.0,
         )
+        ACHIEVEMENTS.associate { a -> a.id to maxOf(local[a.id] ?: 0.0, web(a.id)) }
     }
     val earned = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
     val total = ACHIEVEMENTS.sumOf { it.tiers.size }

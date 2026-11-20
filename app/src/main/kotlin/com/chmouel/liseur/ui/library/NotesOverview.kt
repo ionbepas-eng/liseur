@@ -38,6 +38,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.ui.text.withStyle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
@@ -129,7 +132,15 @@ internal fun NotesOverview(
     var tint by rememberSaveable { mutableStateOf<String?>(null) }
     var bookFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<BookAnnotation?>(null) }
-    val (marks, books) = data ?: (emptyList<BookAnnotation>() to emptyMap())
+    val (localMarks, books) = data ?: (emptyList<BookAnnotation>() to emptyMap())
+    // The web's highlights (Play Libros imports included), read from the shared state.
+    val sharedVersion by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val webMarks = remember(sharedVersion, books.size) { webAnnotations(context, books) }
+    val marks = remember(localMarks, webMarks) {
+        val seen = localMarks.mapNotNull { it.text?.trim() }.toSet()
+        (localMarks + webMarks.filter { it.text?.trim() !in seen }).sortedByDescending { it.createdAt }
+    }
+    var importing by remember { mutableStateOf(false) }
     val ink = MaterialTheme.colorScheme.onSurface
     val paper = if (ink.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
@@ -164,22 +175,13 @@ internal fun NotesOverview(
             }
         }
         if (section == 1) {
-            item {
-                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Vocabulario", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                    Text(
-                        "Aquí aparecerán las palabras que guardes mientras lees, con su definición. Llega con la próxima versión del lector.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            item { VocabSection() }
             return@LazyColumn
         }
         val withNote = marks.count { !it.note.isNullOrBlank() }
         item {
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column {
                     Text("Subrayados y notas", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                     Text(
                         "${marks.size} ${if (marks.size == 1) "subrayado" else "subrayados"} · $withNote con nota · ${marks.map { it.bookId }.distinct().size} ${if (marks.map { it.bookId }.distinct().size == 1) "libro" else "libros"}",
@@ -187,8 +189,14 @@ internal fun NotesOverview(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                Row {
+                androidx.compose.material3.OutlinedButton(onClick = { importing = true }) {
+                    Text("↓ Importar de Play Libros", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                }
+                Spacer(Modifier.width(8.dp))
                 androidx.compose.material3.OutlinedButton(onClick = { exportAll(context, marks, books) }, enabled = marks.isNotEmpty()) {
                     Text("Exportar todo", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                }
                 }
             }
         }
@@ -260,11 +268,11 @@ internal fun NotesOverview(
                         book?.let { b ->
                             com.chmouel.liseur.ui.library.styles.QuoteShare.share(
                                 context,
-                                com.chmouel.liseur.data.quotes.HomeQuote(b, mark.text.orEmpty().trim(), mark.chapter, mark.locatorJson, true),
+                                com.chmouel.liseur.data.quotes.HomeQuote(b, mark.text.orEmpty().trim(), mark.chapter, mark.locatorJson.takeUnless { it.startsWith("source:") }, true),
                             )
                         }
                     },
-                    onEdit = { editing = mark },
+                    onEdit = if (mark.id.startsWith("web:")) null else ({ editing = mark }),
                     onCopy = {
                         val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                         cm?.setPrimaryClip(android.content.ClipData.newPlainText("cita", "«${mark.text.orEmpty().trim()}» — ${book?.title.orEmpty()}"))
@@ -273,6 +281,7 @@ internal fun NotesOverview(
             }
         }
     }
+    if (importing) PlayImportDialog(books.values.filter { !it.hidden }.toList()) { importing = false }
     editing?.let { mark ->
         var note by remember { mutableStateOf(mark.note.orEmpty()) }
         androidx.compose.material3.AlertDialog(
@@ -337,7 +346,7 @@ private fun exportAll(context: android.content.Context, marks: List<BookAnnotati
 }
 
 @Composable
-private fun MarkCard(mark: BookAnnotation, onClick: () -> Unit, onShare: () -> Unit, onEdit: () -> Unit, onCopy: () -> Unit) {
+private fun MarkCard(mark: BookAnnotation, onClick: () -> Unit, onShare: () -> Unit, onEdit: (() -> Unit)?, onCopy: () -> Unit) {
     val color = tintColor(mark.tint)
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -366,7 +375,7 @@ private fun MarkCard(mark: BookAnnotation, onClick: () -> Unit, onShare: () -> U
                     val day = java.time.Instant.ofEpochMilli(mark.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
                         .format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale("es", "ES")))
                     Text(
-                        listOfNotNull(mark.chapter?.takeIf { it.isNotBlank() }, mark.position?.let { "p. $it" }, day).joinToString(" · "),
+                        listOfNotNull(mark.chapter?.takeIf { it.isNotBlank() }, mark.position?.let { "p. $it" }, day, mark.locatorJson.takeIf { it.startsWith("source:") }?.removePrefix("source:")).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -374,7 +383,7 @@ private fun MarkCard(mark: BookAnnotation, onClick: () -> Unit, onShare: () -> U
                         modifier = Modifier.weight(1f),
                     )
                     androidx.compose.material3.IconButton(onClick = onShare) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Share, "Compartir") }
-                    androidx.compose.material3.IconButton(onClick = onEdit) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Edit, "Editar nota") }
+                    onEdit?.let { androidx.compose.material3.IconButton(onClick = it) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Edit, "Editar nota") } }
                     androidx.compose.material3.IconButton(onClick = onCopy) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.ContentCopy, "Copiar") }
                 }
             }
@@ -390,4 +399,157 @@ private fun tintColor(tint: String?): Color = when (tint?.lowercase()) {
     "pink", "red" -> Color(0xFFB23A6E)
     "purple" -> Color(0xFF8E6BBF)
     else -> MaterialTheme.colorScheme.primary
+}
+
+/** The web's highlights for the books here, as annotations to show (never written back). */
+private fun webAnnotations(context: android.content.Context, books: Map<String, Book>): List<BookAnnotation> {
+    val state = runCatching { org.json.JSONObject(java.io.File(context.filesDir, com.chmouel.liseur.data.gdrive.DriveStateSync.STATE_CACHE).readText()) }.getOrNull()
+    val webBooks = state?.optJSONObject("books") ?: org.json.JSONObject()
+    val pending = com.chmouel.liseur.data.gdrive.LiburuShared.pendingAnnotations(context)
+    val out = ArrayList<BookAnnotation>()
+    val byKey = books.values.associateBy { LiburuShelves.keyOf(it.url) }
+    fun take(key: String, ann: org.json.JSONObject?) {
+        val book = byKey[key] ?: return
+        ann ?: return
+        ann.keys().forEach { id ->
+            val a = ann.optJSONObject(id) ?: return@forEach
+            if (a.optBoolean("deleted") || a.optString("text").isBlank()) return@forEach
+            val color = a.optString("color").lowercase()
+            val tint = when {
+                color.startsWith("#f6d") || color.contains("yellow") -> "yellow"
+                color.startsWith("#f2a") || color.contains("pink") -> "pink"
+                color.startsWith("#a8d") || color.contains("green") -> "green"
+                color.startsWith("#9ec") || color.contains("blue") -> "blue"
+                else -> "yellow"
+            }
+            out += BookAnnotation(
+                id = "web:$id", bookId = book.url, kind = "HIGHLIGHT",
+                locatorJson = "source:" + if (a.optString("imported") == "play") "Play Libros" else "Web",
+                text = a.optString("text"), note = a.optString("note").takeIf { it.isNotBlank() },
+                tint = tint, chapter = a.optString("label").takeIf { it.isNotBlank() },
+                position = a.optInt("page").takeIf { it > 0 },
+                createdAt = a.optLong("created", a.optLong("t")),
+            )
+        }
+    }
+    webBooks.keys().forEach { k -> take(k, webBooks.optJSONObject(k)?.optJSONObject("ann")) }
+    pending.keys().forEach { k -> take(k, pending.optJSONObject(k)) }
+    return out.distinctBy { it.id }
+}
+
+/** «Importar de Play Libros»: each notes document, matched to a book you can change. */
+@Composable
+private fun PlayImportDialog(books: List<Book>, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val docs by androidx.compose.runtime.produceState<Result<List<com.chmouel.liseur.data.gdrive.LiburuPlayNotes.Doc>>?>(null) {
+        value = runCatching { com.chmouel.liseur.data.gdrive.LiburuPlayNotes.findDocs() }
+    }
+    var chosen by remember { mutableStateOf<Map<String, Book?>>(emptyMap()) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val sorted = remember(books) { books.sortedBy { it.title.lowercase() } }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text("Importar de Play Libros") },
+        text = {
+            val r = docs
+            when {
+                status != null -> Text(status!!)
+                r == null -> com.chmouel.liseur.ui.BusyIndicator()
+                r.isFailure -> Text("No se pudo leer Drive. Comprueba la conexión con Google en Ajustes.")
+                r.getOrThrow().isEmpty() -> Text("No he encontrado documentos «Notas de…» de Play Libros en tu Drive.")
+                else -> {
+                    val list = r.getOrThrow()
+                    LaunchedEffect(list) { chosen = list.associate { it.id to com.chmouel.liseur.data.gdrive.LiburuPlayNotes.match(books, it.title) } }
+                    LazyColumn(Modifier.heightIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        item { Text("He encontrado ${list.size} ${if (list.size == 1) "documento" else "documentos"}. Revisa a qué libro corresponde cada uno.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        items(list, key = { it.id }) { d ->
+                            var open by remember { mutableStateOf(false) }
+                            Column {
+                                Text(d.title, style = MaterialTheme.typography.titleSmall)
+                                Box {
+                                    androidx.compose.material3.TextButton(onClick = { open = true }) {
+                                        Text(chosen[d.id]?.title ?: "No importar", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    androidx.compose.material3.DropdownMenu(open, { open = false }) {
+                                        androidx.compose.material3.DropdownMenuItem(text = { Text("No importar") }, onClick = { chosen = chosen + (d.id to null); open = false })
+                                        sorted.forEach { b -> androidx.compose.material3.DropdownMenuItem(text = { Text(b.title, maxLines = 1) }, onClick = { chosen = chosen + (d.id to b); open = false }) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (status == null) {
+                androidx.compose.material3.TextButton(enabled = docs?.getOrNull()?.isNotEmpty() == true, onClick = {
+                    val list = docs?.getOrNull().orEmpty()
+                    status = "Importando…"
+                    scope.launch {
+                        var added = 0
+                        var booksN = 0
+                        var fail = 0
+                        val state = runCatching { org.json.JSONObject(java.io.File(context.filesDir, com.chmouel.liseur.data.gdrive.DriveStateSync.STATE_CACHE).readText()) }.getOrNull()
+                        for (d in list) {
+                            val b = chosen[d.id] ?: continue
+                            try {
+                                val items = com.chmouel.liseur.data.gdrive.LiburuPlayNotes.parse(com.chmouel.liseur.data.gdrive.LiburuPlayNotes.export(d.id))
+                                val key = LiburuShelves.keyOf(b.url)
+                                val existing = state?.optJSONObject("books")?.optJSONObject(key)?.optJSONObject("ann")
+                                val now = System.currentTimeMillis()
+                                val anns = items.mapNotNull { it ->
+                                    val id = com.chmouel.liseur.data.gdrive.LiburuPlayNotes.noteId(key, it.text)
+                                    if (existing?.has(id) == true) null
+                                    else org.json.JSONObject().put("id", id).put("kind", "highlight").put("text", it.text).put("note", it.note)
+                                        .put("color", it.color).put("label", it.chapter).put("page", it.page ?: org.json.JSONObject.NULL)
+                                        .put("cfi", org.json.JSONObject.NULL).put("fraction", org.json.JSONObject.NULL).put("imported", "play")
+                                        .put("created", it.created ?: now).put("t", now)
+                                }
+                                if (anns.isNotEmpty()) { com.chmouel.liseur.data.gdrive.LiburuShared.addAnnotations(context, key, anns); added += anns.size; booksN++ }
+                            } catch (e: Exception) { fail++ }
+                        }
+                        val c = (context.applicationContext as LiseurApplication).container
+                        c.applicationScopeLaunch { c.driveStateSync.syncNow(force = true) }
+                        status = "$added ${if (added == 1) "subrayado importado" else "subrayados importados"} en $booksN ${if (booksN == 1) "libro" else "libros"}" + if (fail > 0) " · $fail con error" else ""
+                    }
+                }) { Text("Importar") }
+            } else {
+                androidx.compose.material3.TextButton(onClick = onDone) { Text("Cerrar") }
+            }
+        },
+        dismissButton = { if (status == null) androidx.compose.material3.TextButton(onClick = onDone) { Text("Cancelar") } },
+    )
+}
+
+/** The words saved while reading, shared with the web. */
+@Composable
+private fun VocabSection() {
+    val context = LocalContext.current
+    val v by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val words = remember(v) { com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context) }
+    var query by remember { mutableStateOf("") }
+    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Vocabulario", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        Text("${words.size} ${if (words.size == 1) "palabra" else "palabras"} · las guardas desde el diccionario del lector", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (words.isNotEmpty()) androidx.compose.material3.OutlinedTextField(query, { query = it }, placeholder = { Text("Buscar palabra") }, singleLine = true, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+        words.filter { query.isBlank() || it.optString("word").contains(query, true) || it.optString("def").contains(query, true) }.forEach { w ->
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(w.optString("word"), style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                            Text("  " + w.optString("lang").uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        w.optString("def").takeIf { it.isNotBlank() && it != "null" }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+                        w.optString("book").takeIf { it.isNotBlank() && it != "null" }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    androidx.compose.material3.IconButton(onClick = { com.chmouel.liseur.data.gdrive.LiburuShared.deleteWord(context, w.optString("id")) }) {
+                        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Delete, "Quitar")
+                    }
+                }
+            }
+        }
+    }
 }

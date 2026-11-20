@@ -309,6 +309,22 @@ fun DefinitionSheet(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                         )
+                        // Liburuville: keep the word in the vocabulary shared with the web.
+                        val vocabVersion by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+                        val saved = remember(vocabVersion, entry, source) {
+                            com.chmouel.liseur.data.gdrive.LiburuShared.isSaved(context, source, entry)
+                        }
+                        AssistChip(
+                            onClick = {
+                                val def = found?.senses?.firstOrNull()?.definitions?.firstOrNull()
+                                com.chmouel.liseur.data.gdrive.LiburuShared.saveWord(
+                                    context, entry, source, def?.replace(Regex("<[^>]+>"), "")?.take(400),
+                                    com.chmouel.liseur.data.gdrive.LiburuShared.currentBookTitle,
+                                )
+                            },
+                            enabled = !saved,
+                            label = { Text(if (saved) "Guardada" else "Guardar") },
+                        )
                         if (onSelectText != null) {
                             AssistChip(
                                 onClick = onSelectText,

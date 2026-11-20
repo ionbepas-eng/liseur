@@ -51,6 +51,8 @@ class DriveStateSync(
     private val lock = Mutex()
     private val hcChanges = mutableListOf<Pair<String, HardcoverSync.Change>>()
     @Volatile private var lastRun = 0L
+    /** When the last full sync ended well, for Ajustes. */
+    val lastSyncAt = kotlinx.coroutines.flow.MutableStateFlow(0L)
 
     private val deviceId: String by lazy {
         val prefs = app.getSharedPreferences("gdrive_sync", Context.MODE_PRIVATE)
@@ -66,7 +68,9 @@ class DriveStateSync(
         if (!lock.tryLock()) return
         try {
             lastRun = System.currentTimeMillis()
-            withContext(Dispatchers.IO) { runCatching { run() }.onFailure { Log.w(TAG, "sync failed", it) } }
+            withContext(Dispatchers.IO) {
+                runCatching { run() }.onFailure { Log.w(TAG, "sync failed", it) }.onSuccess { lastSyncAt.value = System.currentTimeMillis() }
+            }
         } finally {
             lock.unlock()
         }
@@ -371,7 +375,7 @@ class DriveStateSync(
                     .put("id", "and-$deviceId-${s.id}")
                     .put("bookId", "g:" + s.bookUrl.removePrefix(DRIVE_URL))
                     .put("device", "android-$deviceId")
-                    .put("deviceName", "Android")
+                    .put("deviceName", liburuPrefs.getString("deviceName", null) ?: android.os.Build.MODEL ?: "Android")
                     .put("start", s.startedAt)
                     .put("end", end)
                     .put("seconds", s.durationMs / 1000)

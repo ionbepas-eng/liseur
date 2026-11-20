@@ -35,6 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import kotlinx.coroutines.launch
+import com.chmouel.liseur.container
 import com.chmouel.liseur.R
 import com.chmouel.liseur.ui.library.styles.LiburuPrefs
 import com.chmouel.liseur.ui.theme.LiburuAppearance
@@ -46,6 +49,7 @@ internal fun LiburuSettings() {
     val context = LocalContext.current
     LiburuAppearance.init(context)
     val look by LiburuAppearance.look.collectAsState()
+    LiburuDriveSettings()
 
     SettingsGroup(stringResource(R.string.liburu_appearance)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -110,8 +114,78 @@ internal fun LiburuSettings() {
             )
         }
     }
+    LiburuDeviceSettings()
     LiburuHardcoverSettings()
     LiburuNewsSettings()
+}
+
+/** «Google Drive», as on the web: who is connected, the last sync and Sincronizar. */
+@Composable
+private fun LiburuDriveSettings() {
+    val context = LocalContext.current
+    val c = context.container
+    val server by remember { c.database.remoteServerDao().observe() }.collectAsState(null)
+    val last by c.driveStateSync.lastSyncAt.collectAsState()
+    var busy by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    SettingsGroup("Google Drive") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (server != null) "Conectado" else "Sin conectar", style = MaterialTheme.typography.titleMedium)
+                    Text(server?.accountId ?: "Conecta tu cuenta en «Biblioteca» → Añadir → servidor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Sincronización", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (last > 0) "Última: " + java.time.Instant.ofEpochMilli(last).atZone(java.time.ZoneId.systemDefault()).toLocalTime().toString().take(5) else "—",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                androidx.compose.material3.OutlinedButton(enabled = !busy, onClick = {
+                    busy = true
+                    scope.launch {
+                        runCatching { c.remoteCatalog.refresh() }
+                        c.driveStateSync.syncNow(force = true)
+                        busy = false
+                    }
+                }) { Text(if (busy) "Sincronizando…" else "Sincronizar") }
+            }
+        }
+    }
+}
+
+/** «Este dispositivo»: its name in sessions, and taking your data out (CSV, Babelio). */
+@Composable
+private fun LiburuDeviceSettings() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var babelio by remember { mutableStateOf<String?>(null) }
+    SettingsGroup("Este dispositivo") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            var dev by remember { mutableStateOf(context.getSharedPreferences("liburu", 0).getString("deviceName", android.os.Build.MODEL).orEmpty()) }
+            OutlinedTextField(
+                dev, { dev = it; context.getSharedPreferences("liburu", 0).edit().putString("deviceName", it.trim()).apply() },
+                label = { Text("Nombre (aparece en tus sesiones)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Exportar mis datos", style = MaterialTheme.typography.titleMedium)
+                    Text("Sesiones y libros en CSV", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.OutlinedButton(onClick = { scope.launch { LiburuExport.csv(context) } }) { Text("Exportar") }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Babelio", style = MaterialTheme.typography.titleMedium)
+                    Text(babelio ?: "Tu biblioteca en el formato de importación de Babelio (ISBN, estado, nota, estanterías)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.OutlinedButton(onClick = { scope.launch { babelio = LiburuExport.babelio(context) } }) { Text("Exportar") }
+            }
+        }
+    }
 }
 
 @Composable

@@ -977,9 +977,21 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
  * (Goodreads, Spotify, Amazon, Kobo…), the browser otherwise. Android 12+
  * sends unverified links to the browser unless asked for a non-browser app.
  */
+private val APP_PKGS = listOf(
+    "goodreads.com" to "com.goodreads", "babelio.com" to "com.babelio.babelio", "fable.co" to "co.fable.fable",
+    "hardcover.app" to "app.hardcover", "storytel.com" to "grit.storytel.app", "kobo.com" to "com.kobobooks.android",
+    "amazon.es" to "com.amazon.kindle", "play.google.com" to "com.android.vending", "open.spotify.com" to "com.spotify.music",
+    "ivoox.com" to "com.ivoox.app", "youtube.com" to "com.google.android.youtube",
+)
+
 internal fun openUrl(context: android.content.Context, url: String) {
     val uri = android.net.Uri.parse(url)
     val view = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    // Apps that do not claim their own links (Babelio, Fable…) are asked by name, as the web does.
+    val host = uri.host.orEmpty().lowercase()
+    APP_PKGS.firstOrNull { (h, _) -> host == h || host.endsWith(".$h") }?.second?.let { pkg ->
+        if (runCatching { context.startActivity(android.content.Intent(view).setPackage(pkg)) }.isSuccess) return
+    }
     if (android.os.Build.VERSION.SDK_INT >= 30) {
         val app = android.content.Intent(view).addFlags(android.content.Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER)
         if (runCatching { context.startActivity(app) }.isSuccess) return

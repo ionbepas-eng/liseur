@@ -59,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -792,6 +793,18 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
     var open by remember { mutableStateOf<Achv?>(null) }
     var page by remember { mutableStateOf(false) }
     if (page) LogrosPage(data, zone, values, onBadge = { open = it }) { page = false }
+    // «Nuevo logro», as the web celebrates it: once per new tier, never on the first look.
+    var fresh by remember { mutableStateOf<List<Pair<Achv, Int>>>(emptyList()) }
+    LaunchedEffect(values) {
+        val prefs = context.getSharedPreferences("liburu", 0)
+        val first = !prefs.contains("achvSeen")
+        val seen = runCatching { JSONObject(prefs.getString("achvSeen", "{}")!!) }.getOrDefault(JSONObject())
+        val news = ACHIEVEMENTS.mapNotNull { a -> val t = a.tiers.count { (values[a.id] ?: 0.0) >= it }; if (t > seen.optInt(a.id)) a to t else null }
+        news.forEach { (a, t) -> seen.put(a.id, t) }
+        prefs.edit().putString("achvSeen", seen.toString()).apply()
+        if (!first && news.isNotEmpty()) fresh = news
+    }
+    fresh.firstOrNull()?.let { (a, t) -> Celebrate(a, t, fresh.size - 1, onLogros = { fresh = emptyList(); page = true }) { fresh = emptyList() } }
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         LevelCard(values)
         Card {
@@ -1285,5 +1298,38 @@ private fun LevelCard(values: Map<String, Double>, page: Boolean = false) {
                 }
             }
         } else Text("Sumas puntos por cada página, cada libro terminado (100) y cada logro (50).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+
+private val CONFETTI = listOf(Color(0xFFE8B83A), Color(0xFFC8455F), Color(0xFF6C8FE0), Color(0xFF5E9C5A), Color(0xFFE07A9B))
+
+@Composable
+private fun Celebrate(a: Achv, tier: Int, more: Int, onLogros: () -> Unit, onDone: () -> Unit) {
+    val fall = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { fall.animateTo(1f, androidx.compose.animation.core.tween(1800)) }
+    val bits = remember { List(26) { Triple(Math.random().toFloat(), (Math.random() * 0.35).toFloat(), CONFETTI[it % CONFETTI.size]) } }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDone) {
+        Surface(shape = RoundedCornerShape(28.dp), color = Paper) {
+            Box {
+                androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                    bits.forEach { (x, delay, c) ->
+                        val p = ((fall.value - delay) / (1f - delay)).coerceIn(0f, 1f)
+                        if (p > 0f && p < 1f) drawRect(c, topLeft = androidx.compose.ui.geometry.Offset(x * size.width, p * size.height), size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 12.dp.toPx()), alpha = 1f - p * 0.6f)
+                    }
+                }
+                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Caps("Nuevo logro")
+                    Badge(a, tier, 150.dp)
+                    Text(badgeTitle(a, tier), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                    Text(a.desc(a.tiers[tier - 1]), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    if (more > 0) Text("y $more ${if (more == 1) "logro más" else "logros más"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                        androidx.compose.material3.OutlinedButton(onClick = onLogros) { Text("Ver logros") }
+                        Button(onClick = onDone, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = Paper)) { Text("¡Genial!") }
+                    }
+                }
+            }
+        }
     }
 }

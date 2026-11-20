@@ -148,6 +148,7 @@ internal fun LiburuSettings() {
         }
     }
     LiburuDeviceSettings()
+    LiburuDictionarySettings()
     LiburuHardcoverSettings()
     LiburuNewsSettings()
 }
@@ -383,3 +384,20 @@ private fun swatchName(key: String): String = stringResource(
         else -> R.string.liburu_c_tinta
     },
 )
+
+
+/** «Diccionario», as on the web: where the words you save go. */
+@Composable
+private fun LiburuDictionarySettings() {
+    val context = LocalContext.current
+    val v by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val n = remember(v) { com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context).size }
+    SettingsGroup("Diccionario") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Tu vocabulario", style = MaterialTheme.typography.titleMedium)
+            Text("$n ${if (n == 1) "palabra guardada" else "palabras guardadas"} para repasar. Guárdalas con «Guardar» en la definición mientras lees, y repásalas en Biblioteca › Notas › Vocabulario.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Se comparten con la web: lo que guardas en un sitio aparece en el otro.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}

@@ -76,30 +76,31 @@ internal fun SettingsGroup(
     helpDescription: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+    // As the web's settings: each section a cream card, its name in Fraunces inside it.
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        onHelp?.let {
-            Icon(
-                Icons.AutoMirrored.Outlined.HelpOutline,
-                contentDescription = helpDescription,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .size(32.dp)
-                    .clickable(role = Role.Button, onClick = it)
-                    .padding(6.dp),
-            )
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 18.dp, end = 12.dp, top = 18.dp)) {
+                Text(text = title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+                onHelp?.let {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.HelpOutline,
+                        contentDescription = helpDescription,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .size(32.dp)
+                            .clickable(role = Role.Button, onClick = it)
+                            .padding(6.dp),
+                    )
+                }
+            }
+            Column(content = content)
         }
-    }
-    Card(Modifier.fillMaxWidth()) {
-        Column(content = content)
     }
 }
 

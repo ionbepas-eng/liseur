@@ -132,6 +132,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -956,7 +957,7 @@ fun LibraryScreen(
 
                     sectionsShown && shelvesShown -> ShelvesOverview(
                         books = state.books,
-                        onOpenBook = openShelfBook,
+                        onOpenBook = onOpenBookDetails,
                         bottomInset = bottomInset,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -992,7 +993,7 @@ fun LibraryScreen(
                         onSetGroupBySeries = onSetGroupBySeries,
                         onClearFilters = onClearFilters,
                         onChooseStyle = { choosingStyle = true },
-                        onBookSelected = openShelfBook,
+                        onBookSelected = onOpenBookDetails,
                         onBookLongPress = { sheetBook = it },
                         onSeriesSelected = onSeriesSelected,
                         bottomInset = bottomInset,
@@ -1158,7 +1159,7 @@ fun LibraryScreen(
                         downloads = state.downloads,
                         listState = seriesState,
                         controls = seriesControls,
-                        onBookSelected = openShelfBook,
+                        onBookSelected = onOpenBookDetails,
                         onBookLongPress = { sheetBook = it },
                         onSeriesSelected = onSeriesSelected,
                         bottomInset = bottomInset,
@@ -1191,7 +1192,7 @@ fun LibraryScreen(
                                 controls = controls,
                                 onSetLayout = onSetLayout,
                                 onSetShelfGrouping = onSetShelfGrouping,
-                                onBookSelected = openShelfBook,
+                                onBookSelected = onOpenBookDetails,
                                 onBookLongPress = { sheetBook = it },
                                 onSeriesSelected = onSeriesSelected,
                                 bottomInset = bottomInset,
@@ -1203,7 +1204,7 @@ fun LibraryScreen(
                                 state = shownState,
                                 gridState = listState,
                                 controls = controls,
-                                onBookSelected = openShelfBook,
+                                onBookSelected = onOpenBookDetails,
                                 onBookLongPress = { sheetBook = it },
                                 onSeriesSelected = onSeriesSelected,
                                 bottomInset = bottomInset,
@@ -1221,7 +1222,7 @@ fun LibraryScreen(
                                 onSetGroupBySeries = onSetGroupBySeries,
                                 onClearFilters = onClearFilters,
                                 onChooseStyle = { choosingStyle = true },
-                                onBookSelected = openShelfBook,
+                                onBookSelected = onOpenBookDetails,
                                 onBookLongPress = { sheetBook = it },
                                 onSeriesSelected = onSeriesSelected,
                                 bottomInset = bottomInset,
@@ -2803,14 +2804,26 @@ internal fun PlaceholderCover(book: Book, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun BookCover(book: Book, modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(10.dp)) {
+fun BookCover(book: Book, modifier: Modifier = Modifier, shape: Shape = LiburuCoverShape) {
     val artwork = book.coverPath ?: book.coverUrl
-    val borderModifier = modifier
-        .clip(shape)
-        .border(
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-            shape,
-        )
+    val eInkCover = LocalEInk.current
+    // Liburuville: the web's printed-book look, a spine fold on the left,
+    // a little light from above and a soft drop shadow.
+    val borderModifier = if (eInkCover) {
+        modifier
+            .clip(shape)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)), shape)
+    } else {
+        modifier
+            .shadow(5.dp, shape, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.45f))
+            .clip(shape)
+            .drawWithContent {
+                drawContent()
+                drawRect(LiburuSpine)
+                drawRect(LiburuSheen)
+                drawRect(Color.Black.copy(alpha = 0.18f), style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+            }
+    }
     if (artwork != null) {
         // Covers fade in by default, which on a shelf means every cover on
         // screen fading at once. Electronic paper draws a fade as a short
@@ -2841,6 +2854,23 @@ fun BookCover(book: Book, modifier: Modifier = Modifier, shape: Shape = RoundedC
         }
     }
 }
+
+internal val LiburuCoverShape = RoundedCornerShape(topStart = 2.dp, bottomStart = 2.dp, topEnd = 5.dp, bottomEnd = 5.dp)
+
+private val LiburuSpine = androidx.compose.ui.graphics.Brush.horizontalGradient(
+    0f to Color.Black.copy(alpha = 0.28f),
+    0.015f to Color.Black.copy(alpha = 0.10f),
+    0.026f to Color.White.copy(alpha = 0.28f),
+    0.045f to Color.White.copy(alpha = 0.06f),
+    0.06f to Color.Black.copy(alpha = 0.14f),
+    0.095f to Color.Transparent,
+)
+
+private val LiburuSheen = androidx.compose.ui.graphics.Brush.verticalGradient(
+    0f to Color.White.copy(alpha = 0.10f),
+    0.3f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.06f),
+)
 
 /**
  * Badges sit on cover artwork, not on a themed surface, so they carry their

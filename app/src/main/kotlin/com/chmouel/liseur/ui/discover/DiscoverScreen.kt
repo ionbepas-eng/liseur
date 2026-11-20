@@ -102,7 +102,8 @@ fun DiscoverScreen(
         ClassicsList(source, bottomBarSpace) { openList = null }
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomBarSpace + 24.dp)) {
+    // Its own page colour (clear over a wallpaper), or the window shows through dark.
+    LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentPadding = PaddingValues(bottom = bottomBarSpace + 24.dp)) {
         item {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -178,7 +179,7 @@ private fun LibraryRow(picks: List<Pick>, onOpen: (Book) -> Unit) {
     LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         items(picks, key = { it.book.url }) { p ->
             Column(Modifier.width(132.dp).clickable { onOpen(p.book) }) {
-                BookCover(p.book, Modifier.fillMaxWidth().aspectRatio(2f / 3f).shadow(6.dp, RoundedCornerShape(6.dp)), shape = RoundedCornerShape(6.dp))
+                BookCover(p.book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
                 Text(p.book.displayTitle, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                 Text(p.why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
@@ -189,7 +190,11 @@ private fun LibraryRow(picks: List<Pick>, onOpen: (Book) -> Unit) {
 @Composable
 private fun ClassicsRow(source: FreeCatalog, onMore: () -> Unit) {
     val context = LocalContext.current
-    val books by produceState<List<RemoteBook>?>(null, source) { value = LiburuClassics.books(context, source) }
+    var attempt by remember { mutableStateOf(0) }
+    val books by produceState<List<RemoteBook>?>(null, source, attempt) {
+        value = null
+        value = LiburuClassics.books(context, source, fresh = attempt > 0)
+    }
     Column(Modifier.padding(bottom = 18.dp)) {
         Text(
             LiburuClassics.name(source),
@@ -200,7 +205,10 @@ private fun ClassicsRow(source: FreeCatalog, onMore: () -> Unit) {
         when (val list = books) {
             null -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { BusyIndicator() }
             else -> if (list.isEmpty()) {
-                Text(stringResource(R.string.liburu_dc_unreachable), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp))
+                Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.liburu_dc_unreachable), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.liburu_dc_retry)) }
+                }
             } else {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
@@ -256,7 +264,7 @@ private fun ClassicsList(source: FreeCatalog, bottomBarSpace: Dp, onBack: () -> 
     val owned by remember(serverId) {
         serverId?.let { context.container.browseCatalog.observeOwned(it) } ?: flowOf(emptyMap())
     }.collectAsState(emptyMap())
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = bottomBarSpace + 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = bottomBarSpace + 24.dp)) {
         item {
             Row(Modifier.statusBarsPadding().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }

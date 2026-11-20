@@ -275,8 +275,7 @@ private fun Hero(details: BookDetails, color: Color?) {
             Modifier
                 .width(170.dp)
                 .aspectRatio(2f / 3f)
-                .shadow(18.dp, RoundedCornerShape(6.dp)),
-            shape = RoundedCornerShape(6.dp),
+                .shadow(18.dp, LiburuCoverShape),
         )
     }
 }

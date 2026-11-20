@@ -2309,4 +2309,5 @@
     <string name="liburu_dc_unreachable">Could not reach this catalog right now.</string>
     <string name="liburu_dc_add">Add to my library</string>
     <string name="liburu_dc_in_library">In your library</string>
+    <string name="liburu_dc_retry">Retry</string>
 </resources>

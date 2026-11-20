@@ -521,6 +521,16 @@ private fun LiseurApp(
                     }
 
                     Route.Stats -> {
+                      var classicStats by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                      if (!classicStats && !com.chmouel.liseur.ui.LocalEInk.current) {
+                        com.chmouel.liseur.ui.stats.LiburuStatsScreen(
+                            books = libraryState.books,
+                            onOpenBook = { book -> backStack.push(Route.BookDetails(book.url)) },
+                            onClassic = { classicStats = true },
+                            bottomBarSpace = if (shownTab != null) mainTabBarSpace() else 0.dp,
+                        )
+                      } else {
+                        androidx.activity.compose.BackHandler(enabled = classicStats) { classicStats = false }
                         val model: ReadingStatsViewModel = viewModel(
                             factory = ReadingStatsViewModel.factory(),
                         )
@@ -549,6 +559,7 @@ private fun LiseurApp(
                             bottomBarSpace = if (shownTab != null) mainTabBarSpace() else 0.dp,
                         )
                     }
+                      }
 
                     is Route.BookStats -> {
                         run {

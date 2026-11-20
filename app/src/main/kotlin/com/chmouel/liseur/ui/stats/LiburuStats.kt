@@ -59,6 +59,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.lazy.itemsIndexed
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chmouel.liseur.container
@@ -166,7 +170,18 @@ fun LiburuStatsScreen(
         verticalItemSpacing = 18.dp,
     ) {
         item(span = StaggeredGridItemSpan.FullLine) {
-            Text("Estadísticas", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.statusBarsPadding().padding(top = 20.dp, bottom = 4.dp))
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            var syncing by remember { mutableStateOf(false) }
+            Row(Modifier.statusBarsPadding().padding(top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Estadísticas", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Surface(
+                    onClick = { if (!syncing) { syncing = true; scope.launch { context.container.driveStateSync.syncNow(force = true); syncing = false } } },
+                    shape = CircleShape, color = Color.Transparent, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Sync, "Sincronizar", modifier = Modifier.padding(16.dp).size(28.dp)
+                        .graphicsLayer { rotationZ = if (syncing) 180f else 0f })
+                }
+            }
         }
         item(span = StaggeredGridItemSpan.FullLine) { RecapChips(data, zone) }
         item(span = StaggeredGridItemSpan.FullLine) { Achievements(data, zone) }
@@ -554,25 +569,22 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
     val byDay = ms.groupBy { dayOf(it.start, zone).dayOfMonth }
     var dayOpen by remember { mutableStateOf<Int?>(null) }
     Card {
-        // The web's drawing of the month, with its name over it.
-        val ctx = LocalContext.current
-        val ink = MONTH_INK[ym.monthValue - 1]
-        Box(Modifier.fillMaxWidth().height(170.dp).padding(horizontal = 0.dp).background(Color.Transparent, RoundedCornerShape(16.dp))) {
+        // The month's watercolour; its name sits on the dark band below the painting.
+        Box(Modifier.fillMaxWidth().aspectRatio(2576f / 1438f).androidxClip().background(Color(0xFF1C1A18))) {
             coil3.compose.AsyncImage(
-                model = remember(ym.monthValue) {
-                    coil3.request.ImageRequest.Builder(ctx).data("file:///android_asset/months/m${ym.monthValue - 1}.svg")
-                        .decoderFactory(coil3.svg.SvgDecoder.Factory()).build()
-                },
+                model = "file:///android_asset/monthart/m${ym.monthValue - 1}.webp",
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().androidxClip(),
+                modifier = Modifier.fillMaxSize(),
             )
-            Column(Modifier.align(Alignment.TopCenter).padding(top = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(ym.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = ink)
-                Text("${ym.year}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = ink)
+            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                RoundArrow("‹") { onMonth(ym.minusMonths(1)) }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(ym.month.getDisplayName(TextStyle.FULL_STANDALONE, ES).replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFFF5EFE6))
+                    Text("${ym.year}", style = MaterialTheme.typography.titleSmall, color = Color(0xFFF5EFE6).copy(alpha = 0.75f))
+                }
+                RoundArrow("›", enabled = ym < now) { onMonth(ym.plusMonths(1)) }
             }
-            Box(Modifier.align(Alignment.TopStart).padding(10.dp)) { RoundArrow("‹") { onMonth(ym.minusMonths(1)) } }
-            Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) { RoundArrow("›", enabled = ym < now) { onMonth(ym.plusMonths(1)) } }
         }
         Tiles(listOf("$done" to "libros", fmtNum(pages) to "páginas", "${if (elapsed > 0) (pages / elapsed).toInt() else 0}" to "páginas/día"))
         Row(Modifier.fillMaxWidth()) {
@@ -769,20 +781,22 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
     var open by remember { mutableStateOf<Achv?>(null) }
     var page by remember { mutableStateOf(false) }
     if (page) LogrosPage(data, zone, values, onBadge = { open = it }) { page = false }
-    Card("Logros", "$earned de $total") {
-        TextButton(onClick = { page = true }) { Text("Ver nivel, retos e insignias ›") }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(ACHIEVEMENTS, key = { it.id }) { a ->
-                val v = values[a.id] ?: 0.0
-                val tier = a.tiers.count { v >= it }
-                val color = if (tier == 0) MaterialTheme.colorScheme.surfaceContainerHighest else if (a.tiers.size == 1) Gold else TIER_COLORS[tier - 1]
-                Column(Modifier.width(84.dp).clickable { open = a }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(64.dp).background(color, CircleShape), contentAlignment = Alignment.Center) {
-                        Text(a.glyph, fontSize = 28.sp, modifier = Modifier.then(if (tier == 0) Modifier.background(Color.Transparent) else Modifier), color = Color.Unspecified)
-                        if (tier == 0) Box(Modifier.size(64.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape))
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        LevelCard(values)
+        Card {
+            Column(Modifier.clickable { page = true }) {
+                Text("Logros ›", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Text("$earned de $total insignias", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val shown = ACHIEVEMENTS.sortedByDescending { a -> if (a.tiers.count { (values[a.id] ?: 0.0) >= it } > 0) 1 else 0 }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(shown, key = { it.id }) { a ->
+                    val tier = a.tiers.count { (values[a.id] ?: 0.0) >= it }
+                    Column(Modifier.width(112.dp).clickable { open = a }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Badge(a, tier, 96.dp)
+                        Text(badgeTitle(a, tier), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, maxLines = 2,
+                            color = if (tier == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
                     }
-                    Text(a.name, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
-                    Text(if (tier == 0) "Por conseguir" else if (a.tiers.size == 1) "Conseguido" else TIER_NAMES[tier - 1], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -820,15 +834,20 @@ private fun RecapChips(data: StatsData, zone: ZoneId) {
     var open by remember { mutableStateOf<Any?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("Resúmenes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("Como historias, para ver y compartir", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Resúmenes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+            Text("Como historias, para ver y compartir", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp).weight(1f))
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(chips, key = { it.third.toString() }) { (t, sub, p) ->
-                Surface(onClick = { open = p }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                    Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-                        Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            itemsIndexed(chips, key = { _, c -> c.third.toString() }) { i, (t, sub, p) ->
+                val first = i == 0
+                Surface(
+                    onClick = { open = p }, shape = RoundedCornerShape(26.dp),
+                    color = if (first) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    border = if (first) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column(Modifier.padding(horizontal = 26.dp, vertical = 18.dp)) {
+                        Text(t, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = if (first) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface)
+                        Text(sub, style = MaterialTheme.typography.bodyLarge, color = if (first) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -934,8 +953,6 @@ private fun shareSlide(context: Context, label: String, s: Slide) {
     context.startActivity(android.content.Intent.createChooser(send, "Compartir resumen"))
 }
 
-private val MONTH_INK = listOf("#fff", "#fff", "#21412b", "#4a1420", "#3b2a05", "#06324a", "#fff", "#fff", "#3a1430", "#fff", "#fff", "#fff")
-    .map { Color(android.graphics.Color.parseColor(if (it.length == 4) "#" + it.drop(1).map { c -> "$c$c" }.joinToString("") else it)) }
 
 private fun Modifier.androidxClip() = this.then(Modifier.clip(RoundedCornerShape(16.dp)))
 
@@ -1011,25 +1028,7 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
             LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item { TextButton(onClick = onClose) { Text("‹ Estadísticas") } }
                 item { Text("Logros", style = MaterialTheme.typography.displaySmall) }
-                item {
-                    Card {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(64.dp).background(Gold, CircleShape), contentAlignment = Alignment.Center) { Text("${li + 1}", style = MaterialTheme.typography.headlineMedium, color = Color(0xFF3A2A0A)) }
-                            Column(Modifier.padding(start = 16.dp).weight(1f)) {
-                                Text("Nivel ${li + 1} · ${LEVELS[li].second}", style = MaterialTheme.typography.titleLarge)
-                                Text(next?.let { "${fmtNum(xp)} de ${fmtNum(it.first.toDouble())} puntos para «${it.second}»" } ?: "${fmtNum(xp)} puntos · nivel máximo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                androidx.compose.material3.LinearProgressIndicator(progress = { pct.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), color = Gold, drawStopIndicator = {})
-                            }
-                        }
-                        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            LEVELS.forEachIndexed { i, _ ->
-                                Box(Modifier.weight(1f).height(22.dp).background(if (i <= li) Gold else MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
-                                    Text("${i + 1}", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
-                    }
-                }
+                item { LevelCard(values) }
                 item { Text("Retos", style = MaterialTheme.typography.headlineSmall) }
                 items(retos, key = { it.id }) { r ->
                     val v = progress(r)
@@ -1049,31 +1048,86 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
                 item { Text("Los retos propios se crean en la web por ahora; aquí ves su progreso.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 item {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("Insignias", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                        Text("$tiers de ${ACHIEVEMENTS.sumOf { it.tiers.size }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Insignias", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text("$tiers de ${ACHIEVEMENTS.sumOf { it.tiers.size }}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                items(ACHIEVEMENTS.chunked(3)) { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(ACHIEVEMENTS.chunked(2)) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         row.forEach { a ->
                             val v = values[a.id] ?: 0.0
                             val tier = a.tiers.count { v >= it }
                             val nx = a.tiers.getOrNull(tier)
-                            val color = if (tier == 0) MaterialTheme.colorScheme.surfaceContainerHighest else if (a.tiers.size == 1) Gold else TIER_COLORS[tier - 1]
-                            Column(Modifier.weight(1f).clickable { onBadge(a) }.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(Modifier.size(72.dp).background(color, CircleShape), contentAlignment = Alignment.Center) {
-                                    Text(a.glyph, fontSize = 32.sp)
-                                    if (tier == 0) Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape))
+                            Surface(
+                                onClick = { onBadge(a) }, shape = RoundedCornerShape(28.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            ) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Badge(a, tier, 112.dp)
+                                    Text(badgeTitle(a, tier), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+                                        color = if (tier == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                                    Text(nx?.let { a.desc(it) } ?: "Completo", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    nx?.let {
+                                        Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surface, CircleShape)) {
+                                            Box(Modifier.fillMaxWidth((v / it).toFloat().coerceIn(0.02f, 1f)).fillMaxHeight().background(MaterialTheme.colorScheme.primary, CircleShape))
+                                        }
+                                    }
                                 }
-                                Text(if (tier > 0 && a.tiers.size > 1) "${a.name} · ${TIER_NAMES[tier - 1]}" else a.name, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
-                                Text(nx?.let { a.desc(it) } ?: "Completo", style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                                nx?.let { androidx.compose.material3.LinearProgressIndicator(progress = { (v / it).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), drawStopIndicator = {}) }
                             }
                         }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
         }
+    }
+}
+
+
+private fun badgeTitle(a: Achv, tier: Int) = if (tier > 0 && a.tiers.size > 1) "${a.name} · ${TIER_NAMES[tier - 1]}" else a.name
+
+/** The web's medal for this badge at this tier, pre-drawn from its SVG. */
+@Composable
+private fun Badge(a: Achv, tier: Int, size: Dp) {
+    coil3.compose.AsyncImage(
+        model = "file:///android_asset/badges/${a.id}_${tier.coerceIn(0, a.tiers.size)}.webp",
+        contentDescription = badgeTitle(a, tier),
+        modifier = Modifier.size(size).aspectRatio(1f),
+    )
+}
+
+private fun levelOf(values: Map<String, Double>): Triple<Int, Double, Pair<Int, String>?> {
+    val tiers = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
+    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50
+    val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
+    return Triple(li, xp, LEVELS.getOrNull(li + 1))
+}
+
+/** «Tu nivel», as on the web. */
+@Composable
+private fun LevelCard(values: Map<String, Double>) {
+    val (li, xp, next) = levelOf(values)
+    val pct = next?.let { ((xp - LEVELS[li].first) / (it.first - LEVELS[li].first)).toFloat() } ?: 1f
+    Card {
+        Text("Tu nivel", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(104.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("NIVEL", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                    Text("${li + 1}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
+                }
+            }
+            Column(Modifier.padding(start = 20.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(LEVELS[li].second, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Box(Modifier.fillMaxWidth().height(12.dp).background(MaterialTheme.colorScheme.surface, CircleShape)) {
+                    Box(Modifier.fillMaxWidth(pct.coerceIn(0.03f, 1f)).fillMaxHeight().background(MaterialTheme.colorScheme.primary, CircleShape))
+                }
+                Text(next?.let { "${xp.toInt()} / ${it.first} puntos · siguiente: ${it.second}" } ?: "${xp.toInt()} puntos · nivel máximo",
+                    style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Text("Sumas puntos por cada página, cada libro terminado (100) y cada logro (50).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

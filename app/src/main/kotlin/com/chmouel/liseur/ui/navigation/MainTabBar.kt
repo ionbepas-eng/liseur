@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chmouel.liseur.R
 import com.chmouel.liseur.ui.LocalEInk
 import com.chmouel.liseur.ui.theme.homePalette
@@ -138,7 +139,7 @@ fun MainTabBar(
             modifier = Modifier
                 .padding(6.dp)
                 .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             MainTab.entries.filter { it != MainTab.SERIES }.forEach { tab ->
                 TabItem(
@@ -181,6 +182,7 @@ private fun TabItem(
             .selectable(selected = selected, role = Role.Tab, onClick = onClick),
     ) {
         Column(
+            Modifier.padding(horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -188,12 +190,14 @@ private fun TabItem(
                 imageVector = tab.icon(selected),
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(21.dp),
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(tab.label),
-                style = MaterialTheme.typography.labelMedium,
+                // Five labels, «Estadísticas» the longest: small enough to fit a phone whole.
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.sp),
+                softWrap = false,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = tint,
                 maxLines = 1,

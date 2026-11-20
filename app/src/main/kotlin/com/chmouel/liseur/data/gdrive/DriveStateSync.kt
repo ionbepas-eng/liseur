@@ -186,6 +186,7 @@ class DriveStateSync(
         if (hadShelfEdits) changed = true
         if (LiburuShared.mergeVocab(app, state)) changed = true
         if (LiburuShared.mergeWishlist(app, state)) changed = true
+        if (LiburuShared.mergeRetos(app, state)) changed = true
         val hadAnn = LiburuShared.applyAnnotations(app, state)
         if (hadAnn) changed = true
 

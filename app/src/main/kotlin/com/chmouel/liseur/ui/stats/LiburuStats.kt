@@ -59,10 +59,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.itemsIndexed
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chmouel.liseur.container
@@ -85,6 +87,8 @@ import java.util.Locale
 
 private val ES = Locale("es", "ES")
 private val Gold = Color(0xFFE8B83A)
+/** The web's paper white: cards, tracks and day cells, whatever the theme's surface is. */
+private val Paper = Color(0xFFFFFBF8)
 
 /** One reading session, Android's or the web's, the way the web counts them. */
 private data class Sit(val key: String, val start: Long, val seconds: Double, val from: Double?, val to: Double?, val pages: Double?, val device: String = "android-here")
@@ -178,13 +182,14 @@ fun LiburuStatsScreen(
                     onClick = { if (!syncing) { syncing = true; scope.launch { context.container.driveStateSync.syncNow(force = true); syncing = false } } },
                     shape = CircleShape, color = Color.Transparent, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Sync, "Sincronizar", modifier = Modifier.padding(16.dp).size(28.dp)
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, "Sincronizar", modifier = Modifier.padding(16.dp).size(28.dp)
                         .graphicsLayer { rotationZ = if (syncing) 180f else 0f })
                 }
             }
         }
         item(span = StaggeredGridItemSpan.FullLine) { RecapChips(data, zone) }
         item(span = StaggeredGridItemSpan.FullLine) { Achievements(data, zone) }
+        item(span = StaggeredGridItemSpan.FullLine) { RetosCard(data, zone) }
         // Year
         item {
             Card {
@@ -455,7 +460,7 @@ private fun Tiles(tiles: List<Pair<String, String>>) {
 
 @Composable
 private fun RoundArrow(t: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Surface(onClick = onClick, enabled = enabled, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = Modifier.size(40.dp)) {
+    Surface(onClick = onClick, enabled = enabled, shape = CircleShape, color = Paper.copy(alpha = 0.7f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.size(44.dp)) {
         Box(contentAlignment = Alignment.Center) { Text(t, style = MaterialTheme.typography.titleLarge, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline) }
     }
 }
@@ -488,7 +493,7 @@ private fun HBars(rows: List<Pair<String, Int>>, modifier: Modifier, wide: Boole
         rows.forEach { (l, c) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(l, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(if (wide) 130.dp else 40.dp))
-                Box(Modifier.weight(1f).height(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(4.dp))) {
+                Box(Modifier.weight(1f).height(8.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(4.dp))) {
                     Box(Modifier.fillMaxWidth(c.toFloat() / max).fillMaxHeight().background(if (wide) MaterialTheme.colorScheme.primary else Gold, RoundedCornerShape(4.dp)))
                 }
                 Text("$c", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 10.dp).width(24.dp))
@@ -605,17 +610,23 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
                             val today = ym == now && day == LocalDate.now(zone).dayOfMonth
                             Box(
                                 Modifier.fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp))
+                                    .then(if (today) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)).padding(3.dp) else Modifier)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Paper)
                                     .clickable { dayOpen = day },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (top != null) BookCover(top, Modifier.fillMaxSize())
-                                Text(
+                                if (top != null) Text(
                                     "$day",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleSmall.copy(shadow = androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = 6f)),
+                                    fontWeight = FontWeight.Bold, color = Color.White,
+                                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp),
+                                ) else Text(
+                                    "$day",
+                                    style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = if (today) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (top != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = if (top != null) Modifier.background(Color.Black.copy(alpha = 0.35f), CircleShape).padding(horizontal = 6.dp) else Modifier,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -842,12 +853,12 @@ private fun RecapChips(data: StatsData, zone: ZoneId) {
                 val first = i == 0
                 Surface(
                     onClick = { open = p }, shape = RoundedCornerShape(26.dp),
-                    color = if (first) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                    color = if (first) MaterialTheme.colorScheme.onSurface else Paper.copy(alpha = 0.6f),
                     border = if (first) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Column(Modifier.padding(horizontal = 26.dp, vertical = 18.dp)) {
-                        Text(t, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = if (first) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface)
-                        Text(sub, style = MaterialTheme.typography.bodyLarge, color = if (first) MaterialTheme.colorScheme.surface.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = if (first) Paper else MaterialTheme.colorScheme.onSurface)
+                        Text(sub, style = MaterialTheme.typography.bodyLarge, color = if (first) Paper.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -962,7 +973,167 @@ private fun Modifier.androidxClip() = this.then(Modifier.clip(RoundedCornerShape
 private val LEVELS = listOf(0 to "Curioso", 500 to "Hojeador", 1500 to "Lector", 3500 to "Lector asiduo", 7000 to "Devorador", 12000 to "Bibliófilo",
     20000 to "Ratón de biblioteca", 32000 to "Erudito", 50000 to "Sabio", 75000 to "Guardián de Alejandría", 110000 to "Leyenda", 160000 to "Inmortal")
 
-private data class Reto(val id: String, val type: String, val target: Int, val from: Long, val to: Long, val name: String?, val bookKey: String?, val auto: Boolean)
+private data class Reto(val id: String, val type: String, val target: Int, val from: Long, val to: Long, val name: String?, val bookKey: String?, val auto: Boolean, val raw: JSONObject? = null)
+
+private class RetoCalc(val list: List<Reto>, val progress: (Reto) -> Double)
+
+private val RETO_TYPES = listOf("pages" to "Páginas", "minutes" to "Minutos", "books" to "Libros", "days" to "Días leyendo", "en" to "Libros en inglés",
+    "classic" to "Clásicos", "words" to "Palabras nuevas", "highlights" to "Subrayados", "morning" to "Sesiones de mañana", "finish" to "Terminar un libro concreto")
+
+/** The month's three automatic challenges (from your pace, as the web works them out) and yours. */
+@Composable
+private fun rememberRetos(data: StatsData, zone: ZoneId): RetoCalc {
+    val context = LocalContext.current
+    val v by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val marks by remember { context.container.database.annotationDao().observeAllMarks() }.collectAsState(emptyList())
+    return remember(data, v, marks.size) {
+        val state = runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull() ?: JSONObject()
+        val shelves = state.optJSONObject("shelves")
+        val classic = shelves?.keys()?.asSequence()?.filter { Regex("cl[aá]sic", RegexOption.IGNORE_CASE).containsMatchIn(shelves.optJSONObject(it)?.optString("name").orEmpty()) }?.toSet().orEmpty()
+        val vocab = com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context)
+        val fin = data.finishedAt
+        fun progress(r: Reto): Double {
+            val ses = data.sits.filter { it.start >= r.from && it.start < r.to }
+            val finIn = fin.filter { it.value >= r.from && it.value < r.to }.keys
+            return when (r.type) {
+                "pages" -> ses.sumOf { data.sitPages(it) }
+                "minutes" -> ses.sumOf { it.seconds } / 60
+                "books" -> finIn.size.toDouble()
+                "days" -> ses.map { dayOf(it.start, zone) }.toSet().size.toDouble()
+                "en" -> finIn.count { data.peek(it)?.optString("lang")?.lowercase()?.startsWith("en") == true }.toDouble()
+                "classic" -> finIn.count { k -> data.webBooks.optJSONObject(k)?.optJSONObject("meta")?.optJSONArray("shelves")?.let { a -> (0 until a.length()).any { a.optString(it) in classic } } == true }.toDouble()
+                "words" -> vocab.count { it.optLong("created") in r.from until r.to }.toDouble()
+                "highlights" -> marks.count { it.createdAt in r.from until r.to }.toDouble()
+                "morning" -> ses.count { Instant.ofEpochMilli(it.start).atZone(zone).hour < 9 }.toDouble()
+                "finish" -> if (r.bookKey != null && (fin[r.bookKey] ?: 0) in r.from until r.to) 1.0 else 0.0
+                else -> 0.0
+            }
+        }
+        val now = YearMonth.now(zone)
+        val start = now.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val end = now.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        fun span(k: Long) = now.minusMonths(k).let { m -> m.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() to m.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() }
+        val prev = (1L..3L).map { span(it) }
+        val avgPages = prev.sumOf { (f, t) -> progress(Reto("", "pages", 0, f, t, null, null, true)) } / 3
+        val avgDays = prev.sumOf { (f, t) -> progress(Reto("", "days", 0, f, t, null, null, true)) } / 3
+        fun round(x: Double, k: Int) = maxOf(k, (Math.round(x / k) * k).toInt())
+        val pages = minOf(3000, round(maxOf(300.0, avgPages * 1.1), 50))
+        val days = minOf(now.lengthOfMonth(), maxOf(10, Math.round(avgDays).toInt() + 2))
+        val vars = listOf("en" to 1, "words" to 15, "highlights" to 10, "morning" to 5, "classic" to 1, "books" to 2, "minutes" to 600)
+        val (vt, vn) = vars[(now.year * 12 + now.monthValue - 1) % vars.size]
+        val mk = "${now.year}-${now.monthValue - 1}"
+        val auto = listOf(Reto("auto-$mk-pages", "pages", pages, start, end, null, null, true), Reto("auto-$mk-days", "days", days, start, end, null, null, true), Reto("auto-$mk-$vt", vt, vn, start, end, null, null, true))
+        val mine = com.chmouel.liseur.data.gdrive.LiburuShared.retos(context, state).filter { it.optLong("to") > System.currentTimeMillis() }
+            .map { Reto(it.optString("id"), it.optString("type"), it.optInt("target", 1), it.optLong("from"), it.optLong("to"), it.optString("name").takeIf { n -> n.isNotBlank() && n != "null" }, it.optString("bookId").takeIf { b -> b.isNotBlank() && b != "null" }, false, it) }
+            .sortedBy { it.to }
+        RetoCalc(auto + mine, ::progress)
+    }
+}
+
+/** «Retos de <mes>», as on the web, with «Crear un reto». */
+@Composable
+private fun RetosCard(data: StatsData, zone: ZoneId) {
+    val calc = rememberRetos(data, zone)
+    var editing by remember { mutableStateOf<Reto?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    val month = YearMonth.now(zone).month.getDisplayName(TextStyle.FULL_STANDALONE, ES)
+    Card {
+        Text("Retos de $month", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Text("Se ajustan a tu ritmo de los últimos meses", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        calc.list.forEach { r ->
+            val v = calc.progress(r)
+            val done = v >= r.target
+            val days = ((r.to - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
+            Column(Modifier.fillMaxWidth().then(if (r.auto) Modifier else Modifier.clickable { editing = r }), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(retoTitle(r, data), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    if (done) Box(Modifier.size(30.dp).background(Color(0xFF5A9C5A), CircleShape), contentAlignment = Alignment.Center) { Text("✓", color = Color.White, fontWeight = FontWeight.Bold) }
+                    else Text("${fmtNum(v)} / ${fmtNum(r.target)}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Box(Modifier.fillMaxWidth().height(10.dp).background(Paper, CircleShape)) {
+                    if (v > 0) Box(Modifier.fillMaxWidth((v / r.target).toFloat().coerceIn(0.02f, 1f)).fillMaxHeight().background(if (done) Color(0xFF5A9C5A) else MaterialTheme.colorScheme.primary, CircleShape))
+                }
+                Text((if (r.auto) "Reto del mes" else "Tu reto") + " · " + if (done) "¡Conseguido!" else "quedan $days días",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        androidx.compose.material3.OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+            Text("＋ Crear un reto", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+    if (creating || editing != null) RetoDialog(data, editing) { creating = false; editing = null }
+}
+
+@Composable
+private fun RetoDialog(data: StatsData, editing: Reto?, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val zone = ZoneId.systemDefault()
+    val now = LocalDate.now(zone)
+    var type by remember { mutableStateOf(editing?.type ?: "pages") }
+    var target by remember { mutableStateOf((editing?.target ?: 500).toString()) }
+    var name by remember { mutableStateOf(editing?.name.orEmpty()) }
+    var bookKey by remember { mutableStateOf(editing?.bookKey) }
+    val fromDay = editing?.let { Instant.ofEpochMilli(it.from).atZone(zone).toLocalDate() } ?: now
+    val toDay = editing?.let { Instant.ofEpochMilli(it.to - 1).atZone(zone).toLocalDate() } ?: YearMonth.from(now).atEndOfMonth()
+    var from by remember { mutableStateOf(fromDay.toString()) }
+    var to by remember { mutableStateOf(toDay.toString()) }
+    var typeOpen by remember { mutableStateOf(false) }
+    var bookOpen by remember { mutableStateOf(false) }
+    val candidates = remember(data) { data.books.filter { keyOfBook(it) !in data.finishedAt }.sortedBy { it.title.lowercase() } }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(if (editing != null) "Editar reto" else "Nuevo reto") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box {
+                    androidx.compose.material3.OutlinedButton(onClick = { typeOpen = true }, modifier = Modifier.fillMaxWidth()) { Text("Tipo: " + RETO_TYPES.first { it.first == type }.second) }
+                    androidx.compose.material3.DropdownMenu(typeOpen, { typeOpen = false }) {
+                        RETO_TYPES.forEach { (k, l) -> androidx.compose.material3.DropdownMenuItem(text = { Text(l) }, onClick = { type = k; typeOpen = false }) }
+                    }
+                }
+                if (type == "finish") Box {
+                    androidx.compose.material3.OutlinedButton(onClick = { bookOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(bookKey?.let { data.byKey[it]?.title } ?: "Elige el libro", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    androidx.compose.material3.DropdownMenu(bookOpen, { bookOpen = false }, Modifier.heightIn(max = 360.dp)) {
+                        candidates.forEach { b -> androidx.compose.material3.DropdownMenuItem(text = { Text(b.title, maxLines = 1) }, onClick = { bookKey = keyOfBook(b); bookOpen = false }) }
+                    }
+                } else OutlinedTextField(target, { target = it.filter(Char::isDigit) }, label = { Text("Objetivo") }, singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(from, { from = it }, label = { Text("Desde (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(to, { to = it }, label = { Text("Hasta") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(name, { name = it }, label = { Text("Nombre (opcional)") }, placeholder = { Text("Por ejemplo: Leer en el viaje a Chile") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val f = runCatching { LocalDate.parse(from.trim()) }.getOrNull()
+                val t = runCatching { LocalDate.parse(to.trim()) }.getOrNull()
+                val n = target.toIntOrNull()
+                if (f == null || t == null || t.isBefore(f) || (type != "finish" && (n == null || n <= 0)) || (type == "finish" && bookKey == null)) {
+                    android.widget.Toast.makeText(context, "Revisa el objetivo y las fechas", android.widget.Toast.LENGTH_SHORT).show()
+                    return@TextButton
+                }
+                val o = JSONObject().put("type", type).put("target", if (type == "finish") 1 else n)
+                    .put("from", f.atStartOfDay(zone).toInstant().toEpochMilli()).put("to", t.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                    .put("name", name.trim())
+                editing?.id?.let { o.put("id", it) }
+                if (type == "finish") o.put("bookId", bookKey)
+                com.chmouel.liseur.data.gdrive.LiburuShared.saveReto(context, o)
+                context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                onDone()
+            }) { Text("Guardar reto") }
+        },
+        dismissButton = {
+            if (editing?.raw != null) TextButton(onClick = {
+                com.chmouel.liseur.data.gdrive.LiburuShared.deleteReto(context, editing.raw)
+                context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                onDone()
+            }) { Text("Borrar reto") } else TextButton(onClick = onDone) { Text("Cancelar") }
+        },
+    )
+}
 
 private fun retoTitle(r: Reto, data: StatsData): String = r.name?.takeIf { it.isNotBlank() } ?: when (r.type) {
     "pages" -> "Lee ${fmtNum(r.target.toDouble())} páginas"
@@ -981,43 +1152,9 @@ private fun retoTitle(r: Reto, data: StatsData): String = r.name?.takeIf { it.is
 @Composable
 private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double>, onBadge: (Achv) -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
-    val state = remember { runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull() ?: JSONObject() }
-    val fin = data.finishedAt
-    fun progress(r: Reto): Double {
-        val ses = data.sits.filter { it.start >= r.from && it.start < r.to }
-        val finIn = fin.filter { it.value >= r.from && it.value < r.to }.keys
-        return when (r.type) {
-            "pages" -> ses.sumOf { data.sitPages(it) }
-            "minutes" -> ses.sumOf { it.seconds } / 60
-            "books" -> finIn.size.toDouble()
-            "days" -> ses.map { dayOf(it.start, zone) }.toSet().size.toDouble()
-            "en" -> finIn.count { data.peek(it)?.optString("lang")?.lowercase()?.startsWith("en") == true }.toDouble()
-            "words" -> com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context).count { it.optLong("created") in r.from until r.to }.toDouble()
-            "morning" -> ses.count { Instant.ofEpochMilli(it.start).atZone(zone).hour < 9 }.toDouble()
-            "finish" -> if (r.bookKey != null && (fin[r.bookKey] ?: 0) in r.from until r.to) 1.0 else 0.0
-            else -> 0.0
-        }
-    }
-    val now = YearMonth.now(zone)
-    val retos = remember(data) {
-        val start = now.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val end = now.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        fun span(k: Long) = now.minusMonths(k).let { m -> m.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() to m.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli() }
-        val prev = (1L..3L).map { span(it) }
-        val avgPages = prev.sumOf { (f, t) -> progress(Reto("", "pages", 0, f, t, null, null, true)) } / 3
-        val avgDays = prev.sumOf { (f, t) -> progress(Reto("", "days", 0, f, t, null, null, true)) } / 3
-        fun round(v: Double, k: Int) = maxOf(k, (Math.round(v / k) * k).toInt())
-        val pages = minOf(3000, round(maxOf(300.0, avgPages * 1.1), 50))
-        val days = minOf(now.lengthOfMonth(), maxOf(10, Math.round(avgDays).toInt() + 2))
-        val vars = listOf("en" to 1, "words" to 15, "highlights" to 10, "morning" to 5, "classic" to 1, "books" to 2, "minutes" to 600)
-        val (vt, vn) = vars[(now.year * 12 + now.monthValue - 1) % vars.size]
-        val mk = "${now.year}-${now.monthValue - 1}"
-        val auto = listOf(Reto("auto-$mk-pages", "pages", pages, start, end, null, null, true), Reto("auto-$mk-days", "days", days, start, end, null, null, true), Reto("auto-$mk-$vt", vt, vn, start, end, null, null, true))
-        val raw = state.optJSONObject("retos") ?: JSONObject()
-        val mine = raw.keys().asSequence().mapNotNull { raw.optJSONObject(it) }.filter { !it.optBoolean("deleted") && it.optLong("to") > System.currentTimeMillis() }
-            .map { Reto(it.optString("id"), it.optString("type"), it.optInt("target", 1), it.optLong("from"), it.optLong("to"), it.optString("name").takeIf { n -> n.isNotBlank() && n != "null" }, it.optString("bookId").takeIf { b -> b.isNotBlank() && b != "null" }, false) }.toList()
-        auto + mine
-    }
+    val calc = rememberRetos(data, zone)
+    val retos = calc.list
+    fun progress(r: Reto) = calc.progress(r)
     val tiers = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
     val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50
     val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
@@ -1045,7 +1182,6 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
                         }
                     }
                 }
-                item { Text("Los retos propios se crean en la web por ahora; aquí ves su progreso.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 item {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text("Insignias", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -1060,7 +1196,7 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
                             val nx = a.tiers.getOrNull(tier)
                             Surface(
                                 onClick = { onBadge(a) }, shape = RoundedCornerShape(28.dp),
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                color = Paper.copy(alpha = 0.6f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
@@ -1070,7 +1206,7 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
                                         color = if (tier == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                                     Text(nx?.let { a.desc(it) } ?: "Completo", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     nx?.let {
-                                        Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surface, CircleShape)) {
+                                        Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(8.dp).background(Paper, CircleShape)) {
                                             Box(Modifier.fillMaxWidth((v / it).toFloat().coerceIn(0.02f, 1f)).fillMaxHeight().background(MaterialTheme.colorScheme.primary, CircleShape))
                                         }
                                     }
@@ -1115,13 +1251,13 @@ private fun LevelCard(values: Map<String, Double>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(104.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NIVEL", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
-                    Text("${li + 1}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.surface)
+                    Text("NIVEL", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.5.sp, color = Paper.copy(alpha = 0.8f))
+                    Text("${li + 1}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = Paper)
                 }
             }
             Column(Modifier.padding(start = 20.dp).weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(LEVELS[li].second, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                Box(Modifier.fillMaxWidth().height(12.dp).background(MaterialTheme.colorScheme.surface, CircleShape)) {
+                Box(Modifier.fillMaxWidth().height(12.dp).background(Paper, CircleShape)) {
                     Box(Modifier.fillMaxWidth(pct.coerceIn(0.03f, 1f)).fillMaxHeight().background(MaterialTheme.colorScheme.primary, CircleShape))
                 }
                 Text(next?.let { "${xp.toInt()} / ${it.first} puntos · siguiente: ${it.second}" } ?: "${xp.toInt()} puntos · nivel máximo",

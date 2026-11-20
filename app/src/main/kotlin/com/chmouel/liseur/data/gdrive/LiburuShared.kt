@@ -100,6 +100,34 @@ object LiburuShared {
 
     fun mergeWishlist(context: Context, state: JSONObject): Boolean = mergeMap(context, WISH, state, "wishlist")
 
+    // --- Retos (challenges), shared with the web's `retos` ------------------------------
+    private const val RETOS = "liburu-retos.json"
+
+    /** Your own challenges: what this device has, overlaid on what the web last sent. */
+    fun retos(context: Context, state: JSONObject?): List<JSONObject> {
+        val mine = read(context, RETOS)
+        val theirs = state?.optJSONObject("retos") ?: JSONObject()
+        val all = HashMap<String, JSONObject>()
+        theirs.keys().forEach { k -> theirs.optJSONObject(k)?.let { all[k] = it } }
+        mine.keys().forEach { k -> mine.optJSONObject(k)?.let { m -> if (m.optLong("t") >= (all[k]?.optLong("t") ?: -1L)) all[k] = m } }
+        return all.values.filter { !it.optBoolean("deleted") }
+    }
+
+    fun saveReto(context: Context, reto: JSONObject) {
+        val all = read(context, RETOS)
+        val id = reto.optString("id").ifBlank { "r" + java.lang.Long.toString(System.currentTimeMillis(), 36) }
+        write(context, RETOS, all.put(id, reto.put("id", id).put("t", System.currentTimeMillis())))
+        version.value++
+    }
+
+    fun deleteReto(context: Context, reto: JSONObject) {
+        val all = read(context, RETOS)
+        write(context, RETOS, all.put(reto.optString("id"), JSONObject(reto.toString()).put("deleted", true).put("t", System.currentTimeMillis())))
+        version.value++
+    }
+
+    fun mergeRetos(context: Context, state: JSONObject): Boolean = mergeMap(context, RETOS, state, "retos")
+
     private fun mergeMap(context: Context, file: String, state: JSONObject, field: String): Boolean {
         val mine = read(context, file)
         val theirs = state.optJSONObject(field) ?: JSONObject()

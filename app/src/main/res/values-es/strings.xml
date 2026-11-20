@@ -2299,4 +2299,5 @@
     <string name="liburu_bd_download">Descargar</string>
     <string name="liburu_bd_barcode">Código de barras</string>
     <string name="liburu_bd_queued">En cola para descargar (esperando conexión con Drive)</string>
+    <string name="liburu_lib_audio">Audio</string>
 </resources>

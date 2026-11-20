@@ -254,6 +254,9 @@ dependencies {
     // service is Play's.
     implementation(libs.readium.navigator.media.tts)
     implementation(libs.media3.session)
+    // Liburuville: audiobooks streamed from Drive.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.okhttp)
 
     // Already inside readium-navigator, which uses it to lift footnotes out
     // of a chapter. Declared here because the reader parses notes of its own

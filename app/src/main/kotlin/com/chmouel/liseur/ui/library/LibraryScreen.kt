@@ -542,6 +542,7 @@ fun LibraryScreen(
     var notesShown by rememberSaveable { mutableStateOf(false) }
     var shelvesShown by rememberSaveable { mutableStateOf(false) }
     var comicsShown by rememberSaveable { mutableStateOf(false) }
+    var audioShown by rememberSaveable { mutableStateOf(false) }
     val comicIds by LiburuComics.ids.collectAsState()
     val activeStyle = if (showHome) LibraryStyle.HOME else catalogueStyle
     val scrollStyleToTop: (LibraryStyle) -> Unit = { target ->
@@ -961,9 +962,16 @@ fun LibraryScreen(
                 }
                 // Liburuville: Libros · Series · Notas across the top, as on the web.
                 val sectionsShown = !showHome && !archived && state.searchResults == null && !state.loading
+                val ctxAudio = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    com.chmouel.liseur.audio.LiburuAudiobooks.init(ctxAudio)
+                    if (com.chmouel.liseur.audio.LiburuAudiobooks.list.value.isEmpty()) runCatching { com.chmouel.liseur.audio.LiburuAudiobooks.scan(ctxAudio) }
+                }
+                val audioBooks by com.chmouel.liseur.audio.LiburuAudiobooks.list.collectAsState()
                 if (sectionsShown) {
                     LibrarySections(
                         selected = when {
+                            audioShown -> 5
                             shelvesShown -> 3
                             notesShown -> 2
                             showSeries -> 1
@@ -972,7 +980,9 @@ fun LibraryScreen(
                         },
                         seriesAvailable = state.series.isNotEmpty(),
                         comicsAvailable = comicIds.isNotEmpty(),
+                        audioAvailable = audioBooks.isNotEmpty(),
                         onSelect = { section ->
+                            audioShown = section == 5
                             notesShown = section == 2
                             shelvesShown = section == 3
                             comicsShown = section == 4
@@ -983,6 +993,11 @@ fun LibraryScreen(
                 }
                 when {
                     state.loading -> LibrarySkeleton(fillAboveBar)
+
+                    sectionsShown && audioShown -> com.chmouel.liseur.audio.AudiobooksOverview(
+                        bottomInset = bottomInset,
+                        modifier = Modifier.fillMaxSize(),
+                    )
 
                     sectionsShown && shelvesShown -> ShelvesOverview(
                         books = state.books,

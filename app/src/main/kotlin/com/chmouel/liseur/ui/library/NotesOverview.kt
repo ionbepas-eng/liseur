@@ -67,6 +67,7 @@ internal fun LibrarySections(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     comicsAvailable: Boolean = false,
+    audioAvailable: Boolean = false,
 ) {
     val labels = buildList {
         add(0 to R.string.library_section_books)
@@ -74,6 +75,7 @@ internal fun LibrarySections(
         if (seriesAvailable) add(1 to R.string.library_section_series)
         add(3 to R.string.library_section_shelves)
         add(2 to R.string.library_section_notes)
+        if (audioAvailable) add(5 to R.string.liburu_lib_audio)
     }
     val ink = MaterialTheme.colorScheme.onSurface
     val paper = if (ink.luminance() > 0.5f) Color(0xFF111111) else Color.White

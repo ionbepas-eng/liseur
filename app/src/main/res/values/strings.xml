@@ -2373,4 +2373,5 @@
     <string name="liburu_bd_download">Download</string>
     <string name="liburu_bd_barcode">Barcode</string>
     <string name="liburu_bd_queued">Queued to download (waiting for Drive)</string>
+    <string name="liburu_lib_audio">Audio</string>
 </resources>

@@ -395,7 +395,7 @@ private fun LiburuSeriesGrid(
 
 /** Rename (or join into another series by giving its name) and undo, book by book. */
 @Composable
-private fun SeriesEditDialog(
+internal fun SeriesEditDialog(
     shelf: SeriesShelf,
     all: List<SeriesShelf>,
     onSetSeries: (Book, String?, Double?) -> Unit,

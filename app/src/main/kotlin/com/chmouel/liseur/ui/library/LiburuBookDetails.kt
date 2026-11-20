@@ -695,7 +695,7 @@ private fun Empty(text: Int, modifier: Modifier) {
 }
 
 /** The cover's average colour, a little darker, like the web's backdrop. */
-private fun coverColor(path: String?): Color? {
+internal fun coverColor(path: String?): Color? {
     val file = path?.let(::File)?.takeIf { it.exists() } ?: return null
     val opts = BitmapFactory.Options().apply { inSampleSize = 16 }
     val bmp = BitmapFactory.decodeFile(file.path, opts) ?: return null

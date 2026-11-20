@@ -53,6 +53,8 @@ import com.chmouel.liseur.container
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.graphicsLayer
 
+private const val NONE = "none"
+
 /** Liburuville's shelves: the list, one shelf's books, and adding books to it. */
 @Composable
 internal fun ShelvesOverview(
@@ -67,9 +69,14 @@ internal fun ShelvesOverview(
     var openId by rememberSaveable { mutableStateOf<String?>(null) }
     var naming by remember { mutableStateOf<Pair<String?, String>?>(null) }
     var picking by remember { mutableStateOf(false) }
-    val booksOn = { id: String -> books.filter { id in (membership[LiburuShelves.keyOf(it.url)] ?: emptySet()) } }
+    val valid = shelves.map { it.id }.toSet()
+    val booksOn = { id: String ->
+        if (id == NONE) books.filter { (membership[LiburuShelves.keyOf(it.url)] ?: emptySet()).none { s -> s in valid } }
+        else books.filter { id in (membership[LiburuShelves.keyOf(it.url)] ?: emptySet()) }
+    }
+    var confirmDelete by remember { mutableStateOf(false) }
 
-    val open = shelves.firstOrNull { it.id == openId }
+    val open = shelves.firstOrNull { it.id == openId } ?: if (openId == NONE) LiburuShelves.Shelf(NONE, "Sin estantería asignada") else null
     if (open == null) {
         var organizing by remember { mutableStateOf(false) }
         LazyVerticalGrid(
@@ -111,25 +118,34 @@ internal fun ShelvesOverview(
                     onClick = { openId = shelf.id },
                 )
             }
+            if (shelves.isNotEmpty()) item(key = NONE) {
+                val on = booksOn(NONE)
+                FanCard(on, "Sin estantería", androidx.compose.ui.res.pluralStringResource(com.chmouel.liseur.R.plurals.liburu_n_books, on.size, on.size), onClick = { openId = NONE })
+            }
         }
         if (organizing) OrganizeDialog(books) { organizing = false }
     } else {
-        val on = booksOn(open.id)
+        val on = booksOn(open.id).sortedBy { it.title.lowercase() }
+        val real = open.id != NONE
         Column(modifier) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
                 IconButton(onClick = { openId = null }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver") }
-                Text(open.name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                IconButton(onClick = { naming = open.id to open.name }) { Icon(Icons.Outlined.Edit, "Renombrar") }
-                IconButton(onClick = {
-                    LiburuShelves.saveShelf(context, open.id, open.name, deleted = true)
-                    openId = null
-                }) { Icon(Icons.Outlined.Delete, "Borrar estantería") }
+                Text("Estantería", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                if (real) {
+                    IconButton(onClick = { naming = open.id to open.name }) { Icon(Icons.Outlined.Edit, "Cambiar nombre") }
+                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Outlined.Delete, "Borrar estantería") }
+                }
             }
-            FilledTonalButton(onClick = { picking = true }, modifier = Modifier.padding(horizontal = 16.dp)) {
-                Icon(Icons.Outlined.Add, null)
-                Spacer(Modifier.width(6.dp))
-                Text("Añadir o quitar libros")
+            Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(open.name, style = MaterialTheme.typography.displaySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(androidx.compose.ui.res.pluralStringResource(com.chmouel.liseur.R.plurals.liburu_n_books, on.size, on.size), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (real) androidx.compose.material3.OutlinedButton(onClick = { picking = true }, modifier = Modifier.padding(top = 8.dp)) {
+                    Icon(Icons.Outlined.Add, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Añadir libros")
+                }
             }
+            if (on.isEmpty()) Text("No hay libros aquí.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
             Spacer(Modifier.height(8.dp))
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(110.dp),
@@ -141,7 +157,8 @@ internal fun ShelvesOverview(
                 items(on, key = { it.url }) { book ->
                     Column(Modifier.clickable { onOpenBook(book) }) {
                         BookCover(book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
-                        Text(book.title, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                        Text(book.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                        book.author?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                 }
             }
@@ -181,6 +198,13 @@ internal fun ShelvesOverview(
             )
         }
     }
+    if (confirmDelete && open != null) AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("¿Borrar «${open.name}»?") },
+        text = { Text("Borrar la estantería no borra los libros.") },
+        confirmButton = { TextButton(onClick = { LiburuShelves.saveShelf(context, open.id, open.name, deleted = true); confirmDelete = false; openId = null }) { Text("Borrar") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
+    )
     naming?.let { (id, initial) ->
         var name by remember { mutableStateOf(initial) }
         AlertDialog(

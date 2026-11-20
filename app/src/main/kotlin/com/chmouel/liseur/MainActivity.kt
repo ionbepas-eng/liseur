@@ -1200,7 +1200,18 @@ private fun LibraryRoute(
         // Yields to reorder mode's own handler, which cancels the draft
         // before anything leaves the screen.
         BackHandler(enabled = reorder == null) { openSeriesKey = null }
-        SeriesScreen(
+        if (!LocalEInk.current && reorder == null) com.chmouel.liseur.ui.library.LiburuSeriesPage(
+            shelf = openSeries,
+            onBack = { openSeriesKey = null },
+            onRead = { book ->
+                val local = book.openableUri()
+                if (local != null) context.startActivity(ReaderActivity.intent(context, local, book.url)) else viewModel.downloadAndOpen(book)
+            },
+            onDetails = onOpenBookDetails,
+            onMore = { seriesSheetBook = it },
+            onSetSeries = { b, n, i -> viewModel.setBookSeries(b, n, i) },
+            onResetSeries = { viewModel.resetBookSeries(it) },
+        ) else SeriesScreen(
             shelf = openSeries,
             downloads = state.downloads,
             extras = seriesExtras,

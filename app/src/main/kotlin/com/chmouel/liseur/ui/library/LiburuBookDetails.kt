@@ -245,7 +245,7 @@ internal fun LiburuBookDetails(
                         item(key = "byauthor") { ByAuthor(details.book.author.orEmpty(), arr, pad) }
                     }
                     item(key = "where") { WhereToFind(details, pad) }
-                    item(key = "file") { FileInfo(details, pad) }
+                    item(key = "file") { DownloadLine(details, canDownload, download, onDownload, pad) }
                     item(key = "edit") {
                         Column(pad.padding(top = 16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -380,7 +380,7 @@ private fun Head(details: BookDetails, modifier: Modifier) {
         }
         if (tags.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                tags.forEach { s ->
+                listOf(tags.joinToString(", ")).forEach { s ->
                     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
                         Text(s, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
                     }
@@ -554,31 +554,33 @@ private fun Actions(
             }
             else -> Button({}, big, enabled = false) { Text(stringResource(R.string.endpaper_unavailable), style = label) }
         }
+        // Side by side when they fit, as on the web; the stars wrap below on a narrow phone.
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
         var choosing by remember { mutableStateOf(false) }
-        Box {
-            Surface(
-                onClick = { choosing = true },
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.widthIn(min = 220.dp),
-            ) {
-                Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(status.label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false).padding(end = 24.dp))
-                    Icon(Icons.Outlined.ExpandMore, null)
+            Box {
+                Surface(
+                    onClick = { choosing = true },
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.widthIn(min = 180.dp),
+                ) {
+                    Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(status.label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false).padding(end = 24.dp))
+                        Icon(Icons.Outlined.ExpandMore, null)
+                    }
+                }
+                DropdownMenu(choosing, { choosing = false }) {
+                    Status.entries.forEach { s ->
+                        DropdownMenuItem(text = { Text(stringResource(s.label)) }, onClick = { choosing = false; onSetReadingChoice(s.choice) })
+                    }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.reading_status_automatic)) },
+                        onClick = { choosing = false; onSetReadingChoice(ReadingStatusChoice.AUTOMATIC) },
+                    )
                 }
             }
-            DropdownMenu(choosing, { choosing = false }) {
-                Status.entries.forEach { s ->
-                    DropdownMenuItem(text = { Text(stringResource(s.label)) }, onClick = { choosing = false; onSetReadingChoice(s.choice) })
-                }
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.reading_status_automatic)) },
-                    onClick = { choosing = false; onSetReadingChoice(ReadingStatusChoice.AUTOMATIC) },
-                )
-            }
-        }
         val rating = details.evaluations.find { it.field == PersonalEvaluation.RATING }?.value?.toIntOrNull()
         val stars = rating?.let { (it + 1) / 2 } ?: 0
         Row {
@@ -590,10 +592,11 @@ private fun Actions(
                         if (n <= stars) Icons.Filled.Star else Icons.Outlined.StarOutline,
                         contentDescription = "$n",
                         tint = if (n <= stars) Gold else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(30.dp),
                     )
                 }
             }
+        }
         }
     }
 }
@@ -1157,4 +1160,33 @@ private fun WhereLinksDialog(label: Int, defaultNames: List<String>, onDone: () 
         },
         dismissButton = { TextButton(onClick = onDone) { Text(stringResource(android.R.string.cancel)) } },
     )
+}
+
+/** The web's line about the file: on this device or not, and the one action that goes with it. */
+@Composable
+private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: DownloadProgress?, onDownload: () -> Unit, modifier: Modifier) {
+    val book = details.book
+    val onDevice = book.openableUrl != null
+    val busy = download != null || book.downloadState == DownloadState.QUEUED || book.downloadState == DownloadState.DOWNLOADING
+    Column(modifier) {
+        HorizontalDivider(Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(
+                    when {
+                        busy -> R.string.download_in_progress
+                        onDevice -> R.string.liburu_bd_on_device
+                        else -> R.string.liburu_bd_not_on_device
+                    },
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            if (!onDevice && !busy && canDownload && book.downloadHref != null) {
+                TextButton(onClick = onDownload) { Text(stringResource(R.string.liburu_bd_download), fontWeight = FontWeight.SemiBold) }
+            }
+        }
+        HorizontalDivider(Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    }
 }

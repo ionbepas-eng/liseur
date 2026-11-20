@@ -2294,4 +2294,7 @@
     <string name="liburu_se_edit_explain">Renómbrala o escribe el nombre de otra serie para unirlas. Deshacer devuelve a cada libro la serie con la que venía.</string>
     <string name="liburu_se_join">Unir a «%1$s»</string>
     <string name="liburu_se_undo">Deshacer</string>
+    <string name="liburu_bd_on_device">Descargado en este dispositivo</string>
+    <string name="liburu_bd_not_on_device">No descargado en este dispositivo</string>
+    <string name="liburu_bd_download">Descargar</string>
 </resources>

@@ -2368,4 +2368,7 @@
     <string name="liburu_se_edit_explain">Rename it, or type the name of another series to join them. Undo puts back the series each book came with.</string>
     <string name="liburu_se_join">Join into «%1$s»</string>
     <string name="liburu_se_undo">Undo</string>
+    <string name="liburu_bd_on_device">Downloaded on this device</string>
+    <string name="liburu_bd_not_on_device">Not downloaded on this device</string>
+    <string name="liburu_bd_download">Download</string>
 </resources>

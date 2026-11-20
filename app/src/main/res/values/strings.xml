@@ -2292,4 +2292,21 @@
     <string name="liburu_bd_isbn">EAN / ISBN</string>
     <string name="liburu_bd_genres">Genres</string>
     <string name="liburu_bd_biblio">Bibliographic information</string>
+    <string name="liburu_tab_discover">Discover</string>
+    <string name="liburu_dc_kicker">Recommendations in Spanish and English</string>
+    <string name="liburu_dc_title">Discover</string>
+    <string name="liburu_dc_next">Your next read</string>
+    <string name="liburu_dc_next_sub">From your library, by your authors, shelves and ratings</string>
+    <string name="liburu_dc_series">Continue your series</string>
+    <string name="liburu_dc_series_sub">The next book of the series you have started</string>
+    <string name="liburu_dc_classics">Free classics</string>
+    <string name="liburu_dc_classics_sub">Public-domain books, legal and DRM-free, ready to read here</string>
+    <string name="liburu_dc_why_next">Next in %1$s</string>
+    <string name="liburu_dc_why_author">You like %1$s</string>
+    <string name="liburu_dc_why_shelf">On your shelf %1$s</string>
+    <string name="liburu_dc_book_n">book %1$s</string>
+    <string name="liburu_dc_more">See more</string>
+    <string name="liburu_dc_unreachable">Could not reach this catalog right now.</string>
+    <string name="liburu_dc_add">Add to my library</string>
+    <string name="liburu_dc_in_library">In your library</string>
 </resources>

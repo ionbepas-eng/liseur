@@ -413,11 +413,11 @@ private fun LiseurApp(
     val selectTab: (MainTab) -> Unit = { tab ->
         if (tab == shownTab) {
             // Only the library screen scrolls back up; Stats and Settings stay put.
-            if (tab != MainTab.STATS && tab != MainTab.SETTINGS) tabs.topRequest++
+            if (tab != MainTab.STATS && tab != MainTab.SETTINGS && tab != MainTab.DISCOVER) tabs.topRequest++
         } else {
             // The archive hides the bar, so a library tab picked from
             // Stats or Settings means its own view, not the archive.
-            if (tab != MainTab.STATS && tab != MainTab.SETTINGS) library.leaveArchive()
+            if (tab != MainTab.STATS && tab != MainTab.SETTINGS && tab != MainTab.DISCOVER) library.leaveArchive()
             when (tab) {
                 MainTab.HOME -> tabs.pickedHome = true
                 MainTab.LIBRARY -> {
@@ -429,7 +429,7 @@ private fun LiseurApp(
                     library.setReadingFilter(com.chmouel.liseur.ui.library.ALL_READING_STATES)
                     library.showSeries(true)
                 }
-                MainTab.STATS, MainTab.SETTINGS -> Unit
+                MainTab.STATS, MainTab.SETTINGS, MainTab.DISCOVER -> Unit
             }
             if (Route.SettingsBackup in backStack) settingsZipBackup.close()
             Snapshot.withMutableSnapshot { backStack.selectTab(tab) }
@@ -437,7 +437,7 @@ private fun LiseurApp(
     }
     // Back from the Stats or Settings tab goes Home, however it was opened.
     val backOrHome: () -> Unit = {
-        if (shownTab == MainTab.STATS || shownTab == MainTab.SETTINGS) selectTab(MainTab.HOME) else back()
+        if (shownTab == MainTab.STATS || shownTab == MainTab.SETTINGS || shownTab == MainTab.DISCOVER) selectTab(MainTab.HOME) else back()
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -510,6 +510,15 @@ private fun LiseurApp(
                         openFreeCatalogs = openFreeCatalogs,
                         onFreeCatalogsOpened = { openFreeCatalogs = false },
                     )
+
+                    Route.Discover -> {
+                        com.chmouel.liseur.ui.discover.DiscoverScreen(
+                            books = libraryState.books,
+                            progressions = libraryState.progressions,
+                            onOpenBook = { book -> backStack.push(Route.BookDetails(book.url)) },
+                            bottomBarSpace = if (shownTab != null) mainTabBarSpace() else 0.dp,
+                        )
+                    }
 
                     Route.Stats -> {
                         val model: ReadingStatsViewModel = viewModel(

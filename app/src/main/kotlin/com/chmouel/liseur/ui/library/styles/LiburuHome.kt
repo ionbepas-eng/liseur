@@ -470,7 +470,7 @@ private fun GoalsCard(
 }
 
 @Composable
-private fun Avatar(modifier: Modifier) {
+internal fun Avatar(modifier: Modifier) {
     val context = LocalContext.current
     val version by LiburuPrefs.avatarVersion.collectAsState()
     val image = remember(version) {

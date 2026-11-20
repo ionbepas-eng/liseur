@@ -2218,4 +2218,21 @@
     <string name="liburu_bd_isbn">EAN / ISBN</string>
     <string name="liburu_bd_genres">Géneros</string>
     <string name="liburu_bd_biblio">Información bibliográfica</string>
+    <string name="liburu_tab_discover">Descubrir</string>
+    <string name="liburu_dc_kicker">Recomendaciones en español e inglés</string>
+    <string name="liburu_dc_title">Descubrir</string>
+    <string name="liburu_dc_next">Tu próxima lectura</string>
+    <string name="liburu_dc_next_sub">De tu biblioteca, según tus autores, estanterías y valoraciones</string>
+    <string name="liburu_dc_series">Continúa tus series</string>
+    <string name="liburu_dc_series_sub">El siguiente libro de las series que has empezado</string>
+    <string name="liburu_dc_classics">Clásicos gratis</string>
+    <string name="liburu_dc_classics_sub">Libros de dominio público, legales y sin DRM, listos para leer aquí</string>
+    <string name="liburu_dc_why_next">Siguiente de %1$s</string>
+    <string name="liburu_dc_why_author">Te gusta %1$s</string>
+    <string name="liburu_dc_why_shelf">En tu estantería %1$s</string>
+    <string name="liburu_dc_book_n">libro %1$s</string>
+    <string name="liburu_dc_more">Ver más</string>
+    <string name="liburu_dc_unreachable">Ahora mismo no se puede consultar este catálogo.</string>
+    <string name="liburu_dc_add">Añadir a mi biblioteca</string>
+    <string name="liburu_dc_in_library">En tu biblioteca</string>
 </resources>

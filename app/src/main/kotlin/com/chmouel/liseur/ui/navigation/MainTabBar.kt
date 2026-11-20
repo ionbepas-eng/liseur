@@ -46,7 +46,7 @@ import com.chmouel.liseur.ui.LocalEInk
 import com.chmouel.liseur.ui.theme.homePalette
 
 /** The destinations of the bottom bar. Home, Library and Series are three views of the library screen. */
-enum class MainTab { HOME, LIBRARY, SERIES, STATS, SETTINGS }
+enum class MainTab { HOME, LIBRARY, DISCOVER, SERIES, STATS, SETTINGS }
 
 /**
  * What the bar shares with the library screen, which draws three of its
@@ -81,6 +81,7 @@ fun rememberMainTabsState(): MainTabsState = rememberSaveable(saver = MainTabsSt
 fun List<Route>.mainTab(library: MainTab): MainTab? = when (toList()) {
     listOf(Route.Library) -> library
     listOf(Route.Library, Route.Stats) -> MainTab.STATS
+    listOf(Route.Library, Route.Discover) -> MainTab.DISCOVER
     listOf(Route.Library, Route.Settings) -> MainTab.SETTINGS
     else -> null
 }
@@ -89,6 +90,7 @@ fun List<Route>.mainTab(library: MainTab): MainTab? = when (toList()) {
 fun MutableList<Route>.selectTab(tab: MainTab) {
     val target = when (tab) {
         MainTab.STATS -> listOf(Route.Library, Route.Stats)
+        MainTab.DISCOVER -> listOf(Route.Library, Route.Discover)
         MainTab.SETTINGS -> listOf(Route.Library, Route.Settings)
         MainTab.HOME, MainTab.LIBRARY, MainTab.SERIES -> listOf(Route.Library)
     }
@@ -206,6 +208,7 @@ private val MainTab.label: Int
         MainTab.HOME -> R.string.library_style_home
         MainTab.LIBRARY -> R.string.library_tab_library
         MainTab.SERIES -> R.string.home_tile_series
+        MainTab.DISCOVER -> R.string.liburu_tab_discover
         MainTab.STATS -> R.string.tab_stats
         MainTab.SETTINGS -> R.string.settings
     }
@@ -215,6 +218,7 @@ private fun MainTab.icon(selected: Boolean): ImageVector = when (this) {
     MainTab.HOME -> com.chmouel.liseur.ui.theme.LiburuIcons.Home
     MainTab.LIBRARY -> com.chmouel.liseur.ui.theme.LiburuIcons.Library
     MainTab.SERIES -> com.chmouel.liseur.ui.theme.LiburuIcons.Series
+    MainTab.DISCOVER -> com.chmouel.liseur.ui.theme.LiburuIcons.Compass
     MainTab.STATS -> com.chmouel.liseur.ui.theme.LiburuIcons.Stats
     MainTab.SETTINGS -> com.chmouel.liseur.ui.theme.LiburuIcons.Settings
 }

@@ -1208,6 +1208,9 @@ fun LibraryScreen(
                         val shownState = if (comicIds.isEmpty() || !sectionsShown) styled else {
                             val keep: (Book) -> Boolean = { b -> (b.url in comicIds) == comicsShown }
                             styled.copy(
+                                quickCounts = styled.quickCounts.copy(
+                                    all = if (comicsShown) comicIds.size else (styled.quickCounts.all - comicIds.size).coerceAtLeast(0),
+                                ),
                                 books = styled.books.filter(keep),
                                 shelfEntries = styled.shelfEntries.filter { e ->
                                     when (e) {

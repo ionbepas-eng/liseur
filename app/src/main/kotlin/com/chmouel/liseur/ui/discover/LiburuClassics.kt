@@ -21,8 +21,7 @@ object LiburuClassics {
     // ManyBooks answers apps with a Cloudflare challenge, so textos.info
     // gives a second row instead.
     val SOURCES = listOf(
-        Source("textos-populares", "textos.info · Más populares", FreeCatalog.TEXTOS_INFO, "https://www.textos.info/populares.atom"),
-        Source("textos-novedades", "textos.info · Novedades", FreeCatalog.TEXTOS_INFO, "https://www.textos.info/novedades.atom"),
+        Source("textos-populares", "textos.info", FreeCatalog.TEXTOS_INFO, "https://www.textos.info/populares.atom"),
         Source("gutenberg-es", "Project Gutenberg", FreeCatalog.GUTENBERG, "gutenberg:shelf:es:POPULAR"),
     )
     private val cache = HashMap<String, List<RemoteBook>>()

@@ -44,6 +44,7 @@ class DriveStateSync(
     private val bookDao: com.chmouel.liseur.data.db.BookDao,
     private val sessionDao: com.chmouel.liseur.data.db.ReadingSessionDao,
     private val evaluations: com.chmouel.liseur.data.db.BookEvaluationDao? = null,
+    private val refreshCatalog: suspend () -> Unit = {},
     private val http: OkHttpClient = DriveAuth.client(),
 ) {
     private val app = context.applicationContext
@@ -95,6 +96,9 @@ class DriveStateSync(
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
         runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
+        // What each EPUB says of itself (series, cover, synopsis), then the
+        // catalog again so the shelf shows it; then covers from the internet.
+        runCatching { if (LiburuPeek.fill(bookDao) > 0) refreshCatalog() }.onFailure { Log.w(TAG, "peek failed", it) }
         runCatching { LiburuCovers.fill(bookDao) }.onFailure { Log.w(TAG, "covers failed", it) }
         // New books go to the automatic shelves on their own, as on the web.
         runCatching {

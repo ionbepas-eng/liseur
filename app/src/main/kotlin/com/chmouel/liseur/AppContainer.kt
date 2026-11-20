@@ -1043,6 +1043,7 @@ class AppContainer(
             bookDao = database.bookDao(),
             sessionDao = database.readingSessionDao(),
             evaluations = database.bookEvaluationDao(),
+            refreshCatalog = { runCatching { remoteCatalog.refresh() } },
         )
     }
 

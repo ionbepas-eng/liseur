@@ -101,16 +101,30 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
     private fun book(f: JSONObject): RemoteBook {
         val id = f.getString("id")
         val (title, author) = DriveNames.titleAndAuthor(f.optString("name"))
+        // What the book says about itself, read ahead of any download.
+        val peek = LiburuPeek.of(id)?.takeIf { !it.optBoolean("failed") }
         return RemoteBook(
             remoteId = id,
             title = title,
             author = author,
-            coverHref = f.optString("thumbnailLink").takeIf { it.isNotEmpty() }
+            coverHref = LiburuPeek.coverUri(id) ?: f.optString("thumbnailLink").takeIf { it.isNotEmpty() }
                 ?.replace(Regex("=s\\d+$"), "=s600") ?: LiburuCovers.cached(id),
             downloadHref = "${DriveAuth.BASE_URL}/files/$id?alt=media",
             sizeBytes = f.optString("size").toLongOrNull(),
             updatedAt = f.optString("modifiedTime").takeIf { it.isNotEmpty() }
                 ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+            seriesName = peek?.optString("series")?.takeIf { it.isNotBlank() },
+            seriesIndex = peek?.takeIf { it.has("index") }?.optDouble("index"),
+            metadata = peek?.let { p ->
+                com.chmouel.liseur.domain.MetadataSnapshot(
+                    description = p.optString("desc").takeIf { it.isNotBlank() },
+                    publishers = listOfNotNull(p.optString("publisher").takeIf { it.isNotBlank() }),
+                    published = p.optString("date").takeIf { it.isNotBlank() },
+                    languages = listOfNotNull(p.optString("lang").takeIf { it.isNotBlank() }),
+                    subjects = p.optJSONArray("subjects")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(),
+                    identifiers = listOfNotNull(p.optString("isbn").takeIf { it.isNotBlank() }?.let { com.chmouel.liseur.domain.Identifier("isbn", it) }),
+                )
+            },
         )
     }
 

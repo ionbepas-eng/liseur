@@ -398,6 +398,9 @@ private fun LiburuDictionarySettings() {
             Text("$n ${if (n == 1) "palabra guardada" else "palabras guardadas"} para repasar. Guárdalas con «Guardar» en la definición mientras lees, y repásalas en Biblioteca › Notas › Vocabulario.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Se comparten con la web: lo que guardas en un sitio aparece en el otro.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Inglés → español sin conexión", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Text("Incluido en la app: unas 81.000 palabras inglesas con su traducción, del Wikcionario (CC BY-SA, vía doozan/spanish_data). Aparece en la definición al marcar una palabra en un libro en inglés. Las definiciones de cada idioma se descargan en Ajustes › Lectura › Diccionarios sin conexión.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

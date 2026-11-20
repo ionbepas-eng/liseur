@@ -32,7 +32,7 @@ object LiburuShared {
     fun isSaved(context: Context, lang: String, word: String) =
         read(context, VOCAB).optJSONObject("$lang:${word.lowercase()}")?.let { !it.optBoolean("deleted") } == true
 
-    fun saveWord(context: Context, word: String, lang: String, def: String?, book: String?) {
+    fun saveWord(context: Context, word: String, lang: String, def: String?, book: String?, tr: String? = null) {
         val all = read(context, VOCAB)
         val id = "$lang:${word.lowercase()}"
         val now = System.currentTimeMillis()
@@ -40,6 +40,7 @@ object LiburuShared {
         e.put("id", id).put("word", word).put("lang", lang).put("deleted", false).put("t", now)
         def?.takeIf { it.isNotBlank() }?.let { e.put("def", it) }
         book?.let { e.put("book", it) }
+        tr?.takeIf { it.isNotBlank() }?.let { e.put("tr", it) }
         write(context, VOCAB, all.put(id, e))
         version.value++
     }

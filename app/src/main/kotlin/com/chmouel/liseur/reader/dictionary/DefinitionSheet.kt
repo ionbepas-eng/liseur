@@ -320,6 +320,7 @@ fun DefinitionSheet(
                                 com.chmouel.liseur.data.gdrive.LiburuShared.saveWord(
                                     context, entry, source, def?.replace(Regex("<[^>]+>"), "")?.take(400),
                                     com.chmouel.liseur.data.gdrive.LiburuShared.currentBookTitle,
+                                    tr = LiburuEnEs.lookupLoaded(context, entry)?.es?.take(3)?.joinToString(", ") { it.first },
                                 )
                             },
                             enabled = !saved,
@@ -338,6 +339,18 @@ fun DefinitionSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+                // Liburuville: the Spanish for an English word, from the bundled dictionary (no connection needed).
+                val englishBook = source.startsWith("en") || (bookLanguage?.startsWith("en") == true)
+                val enEs by produceState<LiburuEnEs.Hit?>(null, term, englishBook) {
+                    value = if (englishBook) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { LiburuEnEs.lookup(context, term) } else null
+                }
+                enEs?.let { hit ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("En español" + if (hit.lemma != term.lowercase()) " · ${hit.lemma}" else "", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(hit.es.joinToString("  ·  ") { (w, pos) -> if (pos.isNotEmpty()) "$w ($pos)" else w }, style = MaterialTheme.typography.titleMedium)
+                        Text("Wiktionary, sin conexión", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 

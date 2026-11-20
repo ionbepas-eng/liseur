@@ -2285,4 +2285,11 @@
     <string name="liburu_ed_language">Language (es, en…)</string>
     <string name="liburu_ed_synopsis">Synopsis</string>
     <string name="liburu_ed_reset">Restore</string>
+    <string name="liburu_bd_fetching">Looking for data online…</string>
+    <string name="liburu_bd_fetch_failed">Could not reach the internet sources</string>
+    <string name="liburu_bd_updated">Data updated %1$s</string>
+    <string name="liburu_bd_refresh">Update data</string>
+    <string name="liburu_bd_isbn">EAN / ISBN</string>
+    <string name="liburu_bd_genres">Genres</string>
+    <string name="liburu_bd_biblio">Bibliographic information</string>
 </resources>

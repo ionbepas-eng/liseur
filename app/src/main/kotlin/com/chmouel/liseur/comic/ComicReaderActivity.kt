@@ -99,6 +99,9 @@ class ComicReaderActivity : ComponentActivity() {
             archive = withContext(Dispatchers.IO) { ComicArchive.localFile(this@ComicReaderActivity, uri)?.let(::ComicArchive) }
             total = archive?.pages?.size ?: 0
             if (total == 0) { finish(); return@launch }
+            // The place another device left, when the book's progression says so.
+            withContext(Dispatchers.IO) { container.database.readingProgressDao().get(bookId)?.totalProgression }
+                ?.let { p -> page = (kotlin.math.round(p * total).toInt() - 1) }
             page = page.coerceIn(0, total - 1)
             loaded = true
         }

@@ -2211,4 +2211,11 @@
     <string name="liburu_ed_language">Idioma (es, en…)</string>
     <string name="liburu_ed_synopsis">Sinopsis</string>
     <string name="liburu_ed_reset">Restaurar</string>
+    <string name="liburu_bd_fetching">Buscando datos en internet…</string>
+    <string name="liburu_bd_fetch_failed">No se pudo consultar internet</string>
+    <string name="liburu_bd_updated">Datos actualizados %1$s</string>
+    <string name="liburu_bd_refresh">Actualizar datos</string>
+    <string name="liburu_bd_isbn">EAN / ISBN</string>
+    <string name="liburu_bd_genres">Géneros</string>
+    <string name="liburu_bd_biblio">Información bibliográfica</string>
 </resources>

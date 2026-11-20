@@ -43,6 +43,7 @@ class DriveStateSync(
     private val annotations: AnnotationBackupRepository,
     private val bookDao: com.chmouel.liseur.data.db.BookDao,
     private val sessionDao: com.chmouel.liseur.data.db.ReadingSessionDao,
+    private val evaluations: com.chmouel.liseur.data.db.BookEvaluationDao? = null,
     private val http: OkHttpClient = DriveAuth.client(),
 ) {
     private val app = context.applicationContext
@@ -84,6 +85,11 @@ class DriveStateSync(
             .put("at", System.currentTimeMillis())
             .put("positions", exportPositions())
             .put("annotations", exportAnnotations())
+            // Liburuville: what else the reader changes on one device.
+            .put("edits", com.chmouel.liseur.ui.library.LiburuEdits.export(app))
+            .put("ratings", exportRatings())
+            .put("feeds", liburuPrefs.getString("feeds", null) ?: JSONObject.NULL)
+            .put("feedsT", liburuPrefs.getLong("feedsT", 0L))
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
         runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
@@ -187,7 +193,40 @@ class DriveStateSync(
         hcChanges.clear()
     }
 
+    private val liburuPrefs get() = app.getSharedPreferences("liburu", Context.MODE_PRIVATE)
+
+    private suspend fun exportRatings(): JSONArray {
+        val out = JSONArray()
+        evaluations?.all()?.filter { it.bookUrl.startsWith(DRIVE_URL) }?.forEach {
+            out.put(JSONObject().put("u", it.bookUrl).put("f", it.field).put("v", it.value ?: JSONObject.NULL).put("t", it.updatedAt))
+        }
+        return out
+    }
+
+    private suspend fun applyLiburu(remote: JSONObject) {
+        remote.optJSONObject("edits")?.let { com.chmouel.liseur.ui.library.LiburuEdits.merge(app, it) }
+        val dao = evaluations
+        remote.optJSONArray("ratings")?.let { arr ->
+            if (dao == null) return@let
+            for (i in 0 until arr.length()) {
+                val r = arr.getJSONObject(i)
+                val url = r.optString("u"); val field = r.optString("f"); val t = r.optLong("t")
+                val value = if (r.isNull("v")) null else r.optString("v")
+                val local = dao.get(url, field)
+                if (t <= (local?.updatedAt ?: 0L) + 1_000) continue
+                val book = bookDao.getByUrl(url) ?: continue
+                runCatching { dao.edit(url, field, value, book.title, book.author.orEmpty(), t) }
+            }
+        }
+        val feedsT = remote.optLong("feedsT")
+        if (feedsT > liburuPrefs.getLong("feedsT", 0L) && !remote.isNull("feeds")) {
+            liburuPrefs.edit().putString("feeds", remote.optString("feeds")).putLong("feedsT", feedsT).apply()
+            java.io.File(app.cacheDir, "liburu-news.json").delete()
+        }
+    }
+
     private suspend fun apply(remote: JSONObject) {
+        runCatching { applyLiburu(remote) }.onFailure { Log.w(TAG, "liburu extras", it) }
         remote.optString("positions").takeIf { it.isNotEmpty() }?.let { text ->
             val newer = decodeReadingPositionBackup(text).filter { position ->
                 if (!position.bookId.startsWith(DRIVE_URL)) return@filter false

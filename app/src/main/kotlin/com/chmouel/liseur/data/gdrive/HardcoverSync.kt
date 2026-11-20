@@ -24,7 +24,7 @@ class HardcoverSync(private val context: Context, private val http: OkHttpClient
     private val proxy get() = prefs.getString("hcProxy", DEFAULT_PROXY)!!.trimEnd('/')
     val enabled get() = prefs.getBoolean("hcSync", true)
 
-    private fun gql(query: String, variables: JSONObject): JSONObject? {
+    internal fun gql(query: String, variables: JSONObject): JSONObject? {
         val body = JSONObject().put("query", query).put("variables", variables).toString()
         val request = Request.Builder().url(proxy)
             .header("Origin", "https://liburuville.netlify.app")

@@ -64,7 +64,7 @@ object LiburuNews {
 
     fun setFeeds(context: Context, list: List<Pair<String, String>>) {
         val a = JSONArray(list.map { JSONObject().put("name", it.first).put("url", it.second) })
-        context.getSharedPreferences("liburu", Context.MODE_PRIVATE).edit().putString("feeds", a.toString()).apply()
+        context.getSharedPreferences("liburu", Context.MODE_PRIVATE).edit().putString("feeds", a.toString()).putLong("feedsT", System.currentTimeMillis()).apply()
         File(context.cacheDir, "liburu-news.json").delete()
     }
 

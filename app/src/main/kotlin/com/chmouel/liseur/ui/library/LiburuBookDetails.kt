@@ -55,6 +55,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -125,7 +129,27 @@ internal fun LiburuBookDetails(
     val context = LocalContext.current
     val editsVersion by LiburuEdits.version.collectAsState()
     val edits = remember(original.book.url, editsVersion) { LiburuEdits.get(context, original.book.url) }
-    val details = remember(original, edits) { LiburuEdits.apply(original, edits) }
+    val netVersion by LiburuEnrich.version.collectAsState()
+    val net = remember(original.book.url, netVersion) { LiburuEnrich.get(context, original.book.url) }
+    val details = remember(original, edits, net) { LiburuEdits.apply(original, edits, net) }
+    var fetching by remember { mutableStateOf(false) }
+    var fetchFailed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val refresh: () -> Unit = {
+        if (!fetching) scope.launch {
+            fetching = true
+            val b = LiburuEdits.apply(original, edits)
+            fetchFailed = !LiburuEnrich.refresh(
+                context, original.book.url, b.book.displayTitle, b.book.author,
+                b.metadata.identifiers.firstOrNull { it.scheme == "isbn" }?.value, b.metadata.languages.firstOrNull(),
+            )
+            fetching = false
+        }
+    }
+    // Like the web: fetched on the first visit and again after a month.
+    LaunchedEffect(original.book.url) {
+        if (net == null || System.currentTimeMillis() - net.optLong("t") > LiburuEnrich.TTL) refresh()
+    }
     var editing by remember { mutableStateOf(false) }
     val book = details.book
     val db = context.container.database
@@ -191,11 +215,28 @@ internal fun LiburuBookDetails(
                         }
                     }
                     item(key = "facts") { Facts(details, sessions, etaSeconds, pad) }
-                    item(key = "publication") { Publication(details, pad) }
+                    item(key = "biblio") { Biblio(details, net, pad) }
                     item(key = "file") { FileInfo(details, pad) }
                     item(key = "edit") {
-                        TextButton(onClick = { editing = true }, modifier = pad.padding(top = 8.dp)) {
-                            Text(stringResource(R.string.liburu_bd_edit))
+                        Column(pad.padding(top = 16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    when {
+                                        fetching -> stringResource(R.string.liburu_bd_fetching)
+                                        fetchFailed -> stringResource(R.string.liburu_bd_fetch_failed)
+                                        net != null -> stringResource(R.string.liburu_bd_updated, day(net.optLong("t"), LocalLocale.current.platformLocale))
+                                        else -> ""
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (fetching) BusyIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                else TextButton(onClick = refresh) { Text(stringResource(R.string.liburu_bd_refresh), fontWeight = FontWeight.SemiBold) }
+                            }
+                            TextButton(onClick = { editing = true }, contentPadding = PaddingValues(0.dp)) {
+                                Text(stringResource(R.string.liburu_bd_edit), fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
@@ -662,13 +703,18 @@ private fun EditDialog(original: BookDetails, edits: Map<String, String>, onDone
             TextButton(onClick = {
                 // Only what differs from the file is kept as the reader's.
                 LiburuEdits.save(context, original.book.url, values.filter { (k, v) -> v.trim() != base[k].orEmpty().trim() })
+                context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
                 onDone()
             }) { Text(stringResource(R.string.liburu_bd_save)) }
         },
         dismissButton = {
             Row {
                 if (edits.isNotEmpty()) {
-                    TextButton(onClick = { LiburuEdits.save(context, original.book.url, emptyMap()); onDone() }) {
+                    TextButton(onClick = {
+                        LiburuEdits.save(context, original.book.url, emptyMap())
+                        context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                        onDone()
+                    }) {
                         Text(stringResource(R.string.liburu_ed_reset))
                     }
                 }
@@ -677,3 +723,43 @@ private fun EditDialog(original: BookDetails, edits: Map<String, String>, onDone
         },
     )
 }
+
+/** A section title as on the web: Fraunces, with an accent rule before it. */
+@Composable
+internal fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Row(modifier.padding(top = 28.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(4.dp).height(34.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(14.dp))
+        Text(text, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun Biblio(details: BookDetails, net: JSONObject?, modifier: Modifier) {
+    val locale = LocalLocale.current.platformLocale
+    val m = details.metadata
+    val cats = net?.optJSONObject("gb")?.optJSONArray("categories")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+    val rows = listOfNotNull(
+        details.book.author?.takeIf { it.isNotBlank() }?.let { R.string.liburu_ed_author to it },
+        m.published?.let { R.string.book_details_published to publishedShort(it, locale) },
+        m.publishers.takeIf { it.isNotEmpty() }?.let { R.string.book_details_publisher to it.joinToString(", ") },
+        m.identifiers.firstOrNull { it.scheme == "isbn" }?.let { R.string.liburu_bd_isbn to it.value },
+        m.pageCount?.let { R.string.book_details_pages to it.toString() },
+        m.languages.firstOrNull()?.let { R.string.book_details_language to languageName(it, locale) },
+        (cats.ifEmpty { m.subjects }).takeIf { it.isNotEmpty() }?.let { R.string.liburu_bd_genres to it.joinToString(", ") },
+    )
+    if (rows.isEmpty()) return
+    Column(modifier) {
+        SectionTitle(stringResource(R.string.liburu_bd_biblio))
+        rows.forEach { (label, value) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                Text(stringResource(label), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.38f))
+                Text(value, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(0.62f))
+            }
+        }
+    }
+}
+
+private fun publishedShort(iso: String, locale: java.util.Locale): String =
+    runCatching { LocalDate.parse(iso.take(10)).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)) }
+        .getOrDefault(iso)

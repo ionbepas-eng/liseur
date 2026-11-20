@@ -28,15 +28,46 @@ object LiburuEdits {
         val root = all(context)
         val o = JSONObject()
         values.forEach { (k, v) -> if (v.isNotBlank()) o.put(k, v.trim()) }
-        if (o.length() == 0) root.remove(LiburuShelves.keyOf(bookUrl)) else root.put(LiburuShelves.keyOf(bookUrl), o.put("t", System.currentTimeMillis()))
+        // An emptied entry stays, with its time, so the other devices drop theirs too.
+        root.put(LiburuShelves.keyOf(bookUrl), o.put("t", System.currentTimeMillis()))
         File(context.filesDir, FILE).writeText(root.toString())
         version.value++
     }
 
+    /** Everything, for the device's file on Drive. */
+    fun export(context: Context): JSONObject = all(context)
+
+    /** Takes each book's edits from another device when they are newer here. */
+    fun merge(context: Context, remote: JSONObject) {
+        val root = all(context)
+        var changed = false
+        remote.keys().forEach { k ->
+            val theirs = remote.optJSONObject(k) ?: return@forEach
+            val mine = root.optJSONObject(k)
+            if (theirs.optLong("t") > (mine?.optLong("t") ?: 0L)) { root.put(k, theirs); changed = true }
+        }
+        if (changed) {
+            File(context.filesDir, FILE).writeText(root.toString())
+            version.value++
+        }
+    }
+
     /** The book as the reader wants it shown. */
-    fun apply(details: BookDetails, e: Map<String, String>): BookDetails {
-        if (e.isEmpty()) return details
-        val m = details.metadata
+    fun apply(details: BookDetails, e: Map<String, String>, net: JSONObject? = null): BookDetails {
+        // What the internet found fills in the publishing data (the EPUB's is
+        // often the scanner's); the reader's own edits win over both.
+        val gb = net?.optJSONObject("gb")
+        if (e.isEmpty() && gb == null) return details
+        fun g(k: String) = gb?.optString(k)?.takeIf { it.isNotBlank() && it != "null" }
+        val m0 = details.metadata
+        val m = m0.copy(
+            publishers = g("publisher")?.let { listOf(it) } ?: m0.publishers,
+            published = g("publishedDate") ?: m0.published,
+            pageCount = gb?.optInt("pageCount")?.takeIf { it > 0 } ?: m0.pageCount,
+            identifiers = if (m0.identifiers.none { it.scheme == "isbn" } && g("isbn13") != null) {
+                listOf(Identifier("isbn", g("isbn13")!!)) + m0.identifiers
+            } else m0.identifiers,
+        )
         val isbn = e["isbn"]?.filter { it.isLetterOrDigit() }
         return details.copy(
             book = details.book.copy(

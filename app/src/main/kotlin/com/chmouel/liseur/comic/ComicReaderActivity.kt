@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -188,10 +189,15 @@ private fun ComicPager(
     val prefs = remember { context.getSharedPreferences("comics", Context.MODE_PRIVATE) }
     var manga by remember { mutableStateOf(prefs.getBoolean("manga", false)) }
     var spreadsOn by remember { mutableStateOf(prefs.getBoolean("spreads", true)) }
+    // Viñeta a viñeta: one panel at a time, tap to move on.
+    var panelMode by remember { mutableStateOf(prefs.getBoolean("panels", false)) }
+    var panel by remember { mutableIntStateOf(0) }
+    var panelCount by remember { mutableIntStateOf(1) }
+    var toLast by remember { mutableStateOf(false) }
     var chrome by remember { mutableStateOf(false) }
     val config = LocalConfiguration.current
     val wide = config.orientation == Configuration.ORIENTATION_LANDSCAPE && config.screenWidthDp >= 600
-    val spreads = wide && spreadsOn
+    val spreads = wide && spreadsOn && !panelMode
     val total = archive.pages.size
     // Spreads: the cover alone, then pairs.
     val groups = remember(spreads, total) {
@@ -203,7 +209,19 @@ private fun ComicPager(
     var zoomed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(pager, groups) {
-        snapshotFlow { pager.currentPage }.collect { onPage(groups[it].first()) }
+        snapshotFlow { pager.currentPage }.collect { onPage(groups[it].first()); panel = if (toLast) Int.MAX_VALUE else 0; toLast = false }
+    }
+    fun step(forward: Boolean) {
+        val nextPage = { by: Int -> scope.launch { pager.animateScrollToPage((pager.currentPage + by).coerceIn(0, groups.size - 1)) } }
+        if (panelMode) {
+            val p = panel.coerceAtMost(panelCount - 1)
+            when {
+                forward && p < panelCount - 1 -> panel = p + 1
+                !forward && p > 0 -> panel = p - 1
+                forward -> nextPage(1)
+                pager.currentPage > 0 -> { toLast = true; nextPage(-1) }
+            }
+        } else nextPage(if (forward) 1 else -1)
     }
     val maxSide = (maxOf(config.screenWidthDp, config.screenHeightDp) * context.resources.displayMetrics.density * 1.5f).toInt()
 
@@ -220,10 +238,14 @@ private fun ComicPager(
                 pages = groups[index].let { if (manga) it.reversed() else it },
                 maxSide = maxSide,
                 onZoomChange = { zoomed = it },
+                panelMode = panelMode && index == pager.currentPage,
+                manga = manga,
+                panel = panel,
+                onPanels = { n -> panelCount = n; if (panel >= n) panel = n - 1 },
                 onTap = { x, width ->
                     when {
-                        x < width * 0.3f -> scope.launch { pager.animateScrollToPage((pager.currentPage + if (manga) 1 else -1).coerceIn(0, groups.size - 1)) }
-                        x > width * 0.7f -> scope.launch { pager.animateScrollToPage((pager.currentPage + if (manga) -1 else 1).coerceIn(0, groups.size - 1)) }
+                        x < width * 0.3f -> step(forward = manga)
+                        x > width * 0.7f -> step(forward = !manga)
                         else -> chrome = !chrome
                     }
                 },
@@ -236,6 +258,12 @@ private fun ComicPager(
             ) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", tint = Color.White) }
                 Text(title, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                FilterChip(
+                    selected = panelMode,
+                    onClick = { panelMode = !panelMode; panel = 0; prefs.edit().putBoolean("panels", panelMode).apply() },
+                    label = { Text("Viñetas") },
+                    modifier = Modifier.padding(end = 6.dp),
+                )
                 FilterChip(selected = manga, onClick = { manga = !manga; prefs.edit().putBoolean("manga", manga).apply() }, label = { Text("Manga") })
                 if (wide) {
                     FilterChip(
@@ -250,7 +278,7 @@ private fun ComicPager(
         AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
             Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.75f)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 val current = groups.getOrNull(pager.currentPage)?.joinToString("–") { (it + 1).toString() } ?: ""
-                Text("Página $current de $total", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text("Página $current de $total" + if (panelMode && panelCount > 1) " · viñeta ${panel.coerceAtMost(panelCount - 1) + 1} de $panelCount" else "", color = Color.White, style = MaterialTheme.typography.labelLarge)
                 var slider by remember(pager.currentPage) { mutableFloatStateOf(pager.currentPage.toFloat()) }
                 Slider(
                     value = slider,
@@ -271,13 +299,28 @@ private fun ZoomableSpread(
     maxSide: Int,
     onZoomChange: (Boolean) -> Unit,
     onTap: (Float, Float) -> Unit,
+    panelMode: Boolean = false,
+    manga: Boolean = false,
+    panel: Int = 0,
+    onPanels: (Int) -> Unit = {},
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val single = pages.size == 1
+    val first by produceState<android.graphics.Bitmap?>(null, pages.firstOrNull()) {
+        value = pages.firstOrNull()?.let { i -> withContext(Dispatchers.IO) { runCatching { archive.page(i, maxSide) }.getOrNull() } }
+    }
+    val panels by produceState<List<android.graphics.RectF>>(emptyList(), first, manga, panelMode) {
+        val b = first
+        value = if (panelMode && single && b != null) withContext(Dispatchers.Default) { runCatching { ComicPanels.detect(b, manga) }.getOrDefault(emptyList()) } else emptyList()
+    }
+    LaunchedEffect(panels) { if (panels.isNotEmpty()) onPanels(panels.size) }
+    val anim = remember { androidx.compose.animation.core.Animatable(0f) }
+    var target by remember { mutableStateOf<Pair<Float, Offset>?>(null) }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
+            .pointerInput(panelMode) {
                 detectTapGestures(
                     onDoubleTap = { at ->
                         if (scale > 1.01f) { scale = 1f; offset = Offset.Zero; onZoomChange(false) }
@@ -287,7 +330,7 @@ private fun ZoomableSpread(
                             onZoomChange(true)
                         }
                     },
-                    onTap = { at -> if (scale <= 1.01f) onTap(at.x, size.width.toFloat()) },
+                    onTap = { at -> if (scale <= 1.01f || panelMode) onTap(at.x, size.width.toFloat()) },
                 )
             }
             .pointerInput(Unit) {
@@ -304,6 +347,37 @@ private fun ZoomableSpread(
                 }
             },
     ) {
+        // In panel mode, frame the current panel: scale it to fit and bring its centre to the middle.
+        val boxW = constraints.maxWidth.toFloat()
+        val boxH = constraints.maxHeight.toFloat()
+        LaunchedEffect(panelMode, panels, panel, boxW, boxH) {
+            val b = first
+            if (!panelMode || b == null || panels.isEmpty()) {
+                if (panelMode.not() && target != null) { target = null; scale = 1f; offset = Offset.Zero; onZoomChange(false) }
+                return@LaunchedEffect
+            }
+            val r = panels[panel.coerceIn(0, panels.size - 1)]
+            val a = b.width.toFloat() / b.height
+            val dispW = if (boxW / boxH > a) boxH * a else boxW
+            val dispH = if (boxW / boxH > a) boxH else boxW / a
+            val left = (boxW - dispW) / 2f
+            val top = (boxH - dispH) / 2f
+            val pw = r.width() * dispW
+            val ph = r.height() * dispH
+            val s2 = (minOf(boxW / pw, boxH / ph) * 0.96f).coerceIn(1f, 5f)
+            val cx = left + (r.left + r.width() / 2f) * dispW
+            val cy = top + (r.top + r.height() / 2f) * dispH
+            val o2 = Offset((boxW / 2f - cx) * s2, (boxH / 2f - cy) * s2)
+            val from = scale to offset
+            target = s2 to o2
+            anim.snapTo(0f)
+            anim.animateTo(1f, androidx.compose.animation.core.tween(380)) {
+                val t = value
+                scale = from.first + (s2 - from.first) * t
+                offset = Offset(from.second.x + (o2.x - from.second.x) * t, from.second.y + (o2.y - from.second.y) * t)
+            }
+            onZoomChange(s2 > 1.01f)
+        }
         Row(
             Modifier.fillMaxSize().graphicsLayer {
                 scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
@@ -312,8 +386,9 @@ private fun ZoomableSpread(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             pages.forEach { index ->
-                val bitmap by produceState<android.graphics.Bitmap?>(null, index) {
-                    value = withContext(Dispatchers.IO) { runCatching { archive.page(index, maxSide) }.getOrNull() }
+                val bitmap by produceState<android.graphics.Bitmap?>(null, index, first) {
+                    value = if (index == pages.first() && first != null) first
+                    else withContext(Dispatchers.IO) { runCatching { archive.page(index, maxSide) }.getOrNull() }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = if (pages.size == 2) (if (index == pages.first()) Alignment.CenterEnd else Alignment.CenterStart) else Alignment.Center) {
                     bitmap?.let {

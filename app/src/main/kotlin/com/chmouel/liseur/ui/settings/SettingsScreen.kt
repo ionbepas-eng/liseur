@@ -115,6 +115,7 @@ fun SettingsScreen(
     /** The room the bottom bar covers, navigation bar included. */
     bottomBarSpace: Dp = 0.dp,
     onOpenSearch: () -> Unit = {},
+    onOpenReadAloud: () -> Unit = {},
     /** Rows a build flavor adds to Reading: read aloud, in both builds. */
     flavorReadingRows: @Composable () -> Unit = {},
     /** Rows for the AI features and the services they use: translation, the reading companion, servers and keys. */
@@ -165,7 +166,7 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 32.dp + (bottomBarSpace - padding.calculateBottomPadding()).coerceAtLeast(0.dp)),
             ) {
-                LiburuSettings()
+                LiburuSettings(onOpenReadAloud)
 
                 SettingsGroup(stringResource(R.string.settings_appearance)) {
                     ChipRow(

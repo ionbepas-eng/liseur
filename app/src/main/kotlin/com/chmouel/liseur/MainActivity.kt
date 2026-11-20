@@ -656,6 +656,7 @@ private fun LiseurApp(
                             onBack = closeSettings.takeIf { shownTab == null },
                             bottomBarSpace = if (shownTab != null) mainTabBarSpace() else 0.dp,
                             onOpenSearch = { backStack.push(Route.SettingsSearch) },
+                            onOpenReadAloud = { openPage(Route.ReadAloud) },
                             flavorReadingRows = {
                                 RowDivider()
                                 Column(Modifier.settingsAnchor(SettingsEntries.ReadAloud)) {

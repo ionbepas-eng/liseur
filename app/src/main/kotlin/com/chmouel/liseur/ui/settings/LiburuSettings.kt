@@ -47,7 +47,7 @@ import com.chmouel.liseur.ui.theme.LiburuAppearance
 /** Liburuville's own settings, at the top of the screen as on the web: appearance, goals, name. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LiburuSettings() {
+internal fun LiburuSettings(onOpenReadAloud: () -> Unit = {}) {
     val context = LocalContext.current
     LiburuAppearance.init(context)
     val look by LiburuAppearance.look.collectAsState()
@@ -149,6 +149,7 @@ internal fun LiburuSettings() {
     }
     LiburuDeviceSettings()
     LiburuDictionarySettings()
+    LiburuReadAloudSettings(onOpenReadAloud)
     LiburuHardcoverSettings()
     LiburuNewsSettings()
 }
@@ -401,6 +402,35 @@ private fun LiburuDictionarySettings() {
             Text("Inglés → español sin conexión", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             Text("Incluido en la app: unas 81.000 palabras inglesas con su traducción, del Wikcionario (CC BY-SA, vía doozan/spanish_data). Aparece en la definición al marcar una palabra en un libro en inglés. Las definiciones de cada idioma se descargan en Ajustes › Lectura › Diccionarios sin conexión.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+
+/** «Lectura en voz alta», as on the web: which voice reads, and where to change it. */
+@Composable
+private fun LiburuReadAloudSettings(onOpen: () -> Unit) {
+    val context = LocalContext.current
+    SettingsGroup("Lectura en voz alta") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Pulsa ▶ dentro de un libro para escucharlo; sigue sonando con la pantalla bloqueada y desde la notificación.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Voces y velocidad", style = MaterialTheme.typography.titleMedium)
+                    Text("Las del teléfono (Samsung o Google) o voces en la nube con tu clave", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.OutlinedButton(onClick = onOpen) { Text("Configurar") }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Voces del sistema", style = MaterialTheme.typography.titleMedium)
+                    Text("Descarga voces en español o inglés de alta calidad", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.OutlinedButton(onClick = {
+                    runCatching { context.startActivity(android.content.Intent("com.android.settings.TTS_SETTINGS").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }) { Text("Abrir") }
+            }
         }
     }
 }

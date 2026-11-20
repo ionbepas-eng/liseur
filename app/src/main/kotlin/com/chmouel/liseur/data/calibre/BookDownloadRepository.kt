@@ -237,16 +237,25 @@ class BookDownloadRepository(
      * and wait for storage, as bulk work does, for when it is one of many
      * the reader added at once.
      */
+    /** Liburuville: a download stuck waiting is started over now, not kept. */
+    suspend fun retry(book: Book) {
+        val key = if (book.browseServerId != null) browseServer(book.browseServerId)?.accountKey ?: return else accountKey()
+        bookDao.setDownloadState(book.url, DownloadState.QUEUED, null)
+        workManager.enqueueUniqueWork(workName(book.url), ExistingWorkPolicy.REPLACE, request(book.url, accountKey = key, batchId = null))
+    }
+
     suspend fun enqueue(book: Book, guardSpace: Boolean = false) {
         val key = if (book.browseServerId != null) {
             browseServer(book.browseServerId)?.accountKey ?: return
         } else {
             accountKey()
         }
+        val running = bookDao.getByUrl(book.url)?.downloadState == DownloadState.DOWNLOADING
         bookDao.setDownloadState(book.url, DownloadState.QUEUED, null)
         workManager.enqueueUniqueWork(
             workName(book.url),
-            ExistingWorkPolicy.KEEP,
+            // A tap on a book waiting out a retry delay starts it now; one already transferring is left alone.
+            if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
             request(book.url, accountKey = key, batchId = null, guardSpace = guardSpace),
         )
     }

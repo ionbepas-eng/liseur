@@ -57,21 +57,21 @@ fun liseurTypography(serif: FontFamily, sans: FontFamily? = null): Typography = 
     fun serifStyle(base: androidx.compose.ui.text.TextStyle, size: Int, line: Int, track: Double, w: FontWeight = FontWeight.SemiBold) =
         base.copy(fontFamily = serif, fontSize = size.sp, lineHeight = line.sp, letterSpacing = track.sp, fontWeight = w)
     copy(
-        displayLarge = serifStyle(displayLarge, 46, 50, -1.2),
-        displayMedium = serifStyle(displayMedium, 40, 44, -1.2),
-        displaySmall = serifStyle(displaySmall, 32, 36, -1.0),
-        headlineLarge = serifStyle(headlineLarge, 30, 34, -0.8),
-        headlineMedium = serifStyle(headlineMedium, 25, 30, -0.6),
-        headlineSmall = serifStyle(headlineSmall, 21, 26, -0.4),
-        titleLarge = serifStyle(titleLarge, 19, 24, -0.2),
-        titleMedium = sansStyle(titleMedium, 15, 20, FontWeight.SemiBold),
-        titleSmall = sansStyle(titleSmall, 13, 18, FontWeight.SemiBold),
-        bodyLarge = sansStyle(bodyLarge, 15, 22),
-        bodyMedium = sansStyle(bodyMedium, 14, 20),
-        bodySmall = sansStyle(bodySmall, 13, 18),
-        labelLarge = sansStyle(labelLarge, 14, 18, FontWeight.Medium),
-        labelMedium = sansStyle(labelMedium, 12, 16, FontWeight.Medium),
-        labelSmall = sansStyle(labelSmall, 11, 14, FontWeight.Medium),
+        displayLarge = serifStyle(displayLarge, 42, 46, -1.2),
+        displayMedium = serifStyle(displayMedium, 36, 40, -1.2),
+        displaySmall = serifStyle(displaySmall, 30, 34, -1.0),
+        headlineLarge = serifStyle(headlineLarge, 27, 31, -0.8),
+        headlineMedium = serifStyle(headlineMedium, 23, 28, -0.6),
+        headlineSmall = serifStyle(headlineSmall, 19, 24, -0.4),
+        titleLarge = serifStyle(titleLarge, 17, 22, -0.2),
+        titleMedium = sansStyle(titleMedium, 14, 19, FontWeight.SemiBold),
+        titleSmall = sansStyle(titleSmall, 12, 16, FontWeight.SemiBold),
+        bodyLarge = sansStyle(bodyLarge, 14, 20),
+        bodyMedium = sansStyle(bodyMedium, 13, 18),
+        bodySmall = sansStyle(bodySmall, 12, 16),
+        labelLarge = sansStyle(labelLarge, 13, 17, FontWeight.Medium),
+        labelMedium = sansStyle(labelMedium, 11, 15, FontWeight.Medium),
+        labelSmall = sansStyle(labelSmall, 10, 13, FontWeight.Medium),
     )
 }
 

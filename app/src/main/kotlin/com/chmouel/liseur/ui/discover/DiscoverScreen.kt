@@ -111,9 +111,9 @@ fun DiscoverScreen(
         return
     }
     openList?.let { name ->
-        val source = LiburuClassics.byKey(name)
+        val source = LiburuClassics.byKey(name.substringBefore('|'))
         BackHandler { openList = null }
-        ClassicsList(source, bottomBarSpace) { openList = null }
+        ClassicsList(source, name.substringAfter('|', ""), bottomBarSpace) { openList = null }
         return
     }
     // Its own page colour (clear over a wallpaper), or the window shows through dark.
@@ -143,7 +143,7 @@ fun DiscoverScreen(
                 ExtRow(wish.map { w -> wishToExt(w) }) { ext = it }
             }
         }
-        item(key = "classics") { ClassicsSection() }
+        item(key = "classics") { ClassicsSection { key, q -> openList = "$key|$q" } }
         item { LiburuNewsRow(Modifier.padding(top = 24.dp)) }
     }
 }
@@ -203,7 +203,7 @@ private fun Header(title: String, sub: String?) {
 
 /** «Clásicos gratis» as on the web: the source, a search box and the list, each with «Añadir a mi biblioteca». */
 @Composable
-private fun ClassicsSection() {
+private fun ClassicsSection(onMore: (String, String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var sourceKey by rememberSaveable { mutableStateOf(LiburuClassics.SOURCES.first().key) }
@@ -252,31 +252,19 @@ private fun ClassicsSection() {
                     Text(if (asked.isNotBlank()) "Sin resultados en ${source.name}." else stringResource(R.string.liburu_dc_unreachable), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     androidx.compose.material3.TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.liburu_dc_retry)) }
                 }
-            } else list.forEach { b ->
-                val state = owned[b.remoteId]?.state
-                Surface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.45f), border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(14.dp)) {
-                        RemoteCover(source, b, Modifier.width(76.dp).aspectRatio(2f / 3f))
-                        Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                            Text(b.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(listOfNotNull(b.author, b.metadata?.published?.take(4)).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
-                            b.metadata?.description?.let { d ->
-                                Text(d.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim(), style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick = { serverId?.let { id -> scope.launch { context.container.browseCatalog.add(id, listOf(b)) } } },
-                                enabled = state == null || state == BrowseOwnedState.FAILED,
-                                colors = ButtonDefaults.buttonColors(containerColor = ink, contentColor = onInk()),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            ) {
-                                when (state) {
-                                    BrowseOwnedState.IN_LIBRARY -> { Icon(Icons.Outlined.Check, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.liburu_dc_in_library)) }
-                                    BrowseOwnedState.QUEUED, BrowseOwnedState.DOWNLOADING -> { BusyIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.download_in_progress)) }
-                                    else -> { Icon(Icons.Outlined.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.liburu_dc_add)) }
-                                }
-                            }
+            } else {
+                // Five cards and a round «+» that opens the whole list, as Ion asked.
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    items(list.take(5), key = { it.remoteId }) { b ->
+                        Column(Modifier.width(108.dp).clickable { onMore(sourceKey, asked) }) {
+                            RemoteCover(source, b, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
+                            Text(b.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                            b.author?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        }
+                    }
+                    item(key = "more") {
+                        Surface(onClick = { onMore(sourceKey, asked) }, shape = CircleShape, color = ink, modifier = Modifier.padding(start = 4.dp, bottom = 36.dp).size(54.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, stringResource(R.string.liburu_dc_more), tint = onInk()) }
                         }
                     }
                 }
@@ -375,10 +363,10 @@ private fun RemoteCover(source: LiburuClassics.Source, book: RemoteBook, modifie
 
 /** The ~15 books of one source as the web lists them, each with its «Añadir». */
 @Composable
-private fun ClassicsList(source: LiburuClassics.Source, bottomBarSpace: Dp, onBack: () -> Unit) {
+private fun ClassicsList(source: LiburuClassics.Source, query: String, bottomBarSpace: Dp, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val books by produceState<List<RemoteBook>?>(null, source) { value = LiburuClassics.books(context, source) }
+    val books by produceState<List<RemoteBook>?>(null, source, query) { value = LiburuClassics.search(context, source, query) }
     val serverId by produceState<Long?>(null, source) { value = LiburuClassics.serverId(context, source.catalog) }
     val owned by remember(serverId) {
         serverId?.let { context.container.browseCatalog.observeOwned(it) } ?: flowOf(emptyMap())

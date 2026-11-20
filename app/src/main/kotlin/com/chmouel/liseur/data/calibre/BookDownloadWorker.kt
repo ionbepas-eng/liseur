@@ -154,8 +154,15 @@ class BookDownloadWorker(
                 // Worth another go later: the network, not the book.
                 is DownloadFailure.Network -> {
                     Log.w(TAG, "download of $bookUrl failed: ${reason.message}")
-                    bookDao.setDownloadState(bookUrl, DownloadState.QUEUED, null)
-                    Result.retry()
+                    // Liburuville: say why in the book's ficha, and stop after a few
+                    // tries instead of waiting hours in the queue with no word.
+                    applicationContext.getSharedPreferences("liburu", 0).edit()
+                        .putString("dlErr:$bookUrl", reason.message).apply()
+                    if (runAttemptCount >= 2) fail(bookUrl)
+                    else {
+                        bookDao.setDownloadState(bookUrl, DownloadState.QUEUED, null)
+                        Result.retry()
+                    }
                 }
                 DownloadFailure.Authentication -> {
                     // The session can no longer be renewed. This is not

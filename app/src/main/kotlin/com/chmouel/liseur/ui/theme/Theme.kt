@@ -339,9 +339,9 @@ fun LiseurTheme(
         LiburuAppearance.look.collectAsState().value.let(LiburuAppearance::wallpaper)
     } else null
     // Outside the reader, text follows the web's sizes: a large system font
-    // setting scales it a little (up to 15 %) rather than all the way.
+    // setting does not scale it (the web on the same phone does not either).
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val chromeDensity = if (readingPage == null && density.fontScale > 1.15f) androidx.compose.ui.unit.Density(density.density, 1.15f) else density
+    val chromeDensity = if (readingPage == null && density.fontScale > 1f) androidx.compose.ui.unit.Density(density.density, 1f) else density
     androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides chromeDensity) {
     MaterialTheme(
         colorScheme = colorScheme,

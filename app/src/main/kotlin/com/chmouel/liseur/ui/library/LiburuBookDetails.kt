@@ -1225,12 +1225,20 @@ private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: D
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            if (!onDevice && book.downloadState == DownloadState.QUEUED && download == null && canDownload) {
-                TextButton(onClick = onDownload) { Text("Reintentar", fontWeight = FontWeight.SemiBold) }
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            if (!onDevice && (book.downloadState == DownloadState.QUEUED || book.downloadState == DownloadState.FAILED) && download == null && canDownload) {
+                TextButton(onClick = {
+                    context.getSharedPreferences("liburu", 0).edit().remove("dlErr:${book.url}").apply()
+                    scope.launch { context.container.bookDownloads.retry(book) }
+                }) { Text("Reintentar", fontWeight = FontWeight.SemiBold) }
             }
             if (!onDevice && !busy && canDownload && book.downloadHref != null) {
                 TextButton(onClick = onDownload) { Text(stringResource(R.string.liburu_bd_download), fontWeight = FontWeight.SemiBold) }
             }
+        }
+        LocalContext.current.getSharedPreferences("liburu", 0).getString("dlErr:${book.url}", null)?.takeIf { !onDevice }?.let {
+            Text("Último error: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 6.dp))
         }
         HorizontalDivider(Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
     }

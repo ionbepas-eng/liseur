@@ -1233,6 +1233,17 @@ private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: D
                     scope.launch { context.container.bookDownloads.retry(book) }
                 }) { Text("Reintentar", fontWeight = FontWeight.SemiBold) }
             }
+            if (onDevice && book.downloadState == DownloadState.DOWNLOADED && book.remoteUuid != null) {
+                var confirm by remember { mutableStateOf(false) }
+                TextButton(onClick = { confirm = true }) { Text("Quitar descarga", fontWeight = FontWeight.SemiBold) }
+                if (confirm) androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text("¿Quitar la descarga?") },
+                    text = { Text("El archivo se borra de este dispositivo para liberar espacio. El libro sigue en tu biblioteca y en Drive, con tu progreso y tus notas.") },
+                    confirmButton = { TextButton(onClick = { confirm = false; scope.launch { context.container.bookDownloads.removeDownload(book) } }) { Text("Quitar") } },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancelar") } },
+                )
+            }
             if (!onDevice && !busy && canDownload && book.downloadHref != null) {
                 TextButton(onClick = onDownload) { Text(stringResource(R.string.liburu_bd_download), fontWeight = FontWeight.SemiBold) }
             }

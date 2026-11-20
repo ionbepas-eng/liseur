@@ -1281,6 +1281,15 @@ fun LibraryScreen(
                 }
             }
             }
+            // Liburuville: «Seleccionar» — the chosen books and what to do with them.
+            val selectingNow by LiburuSelection.active.collectAsState()
+            if (selectingNow) SelectionBar(
+                books = state.books,
+                onSetFinished = onSetFinished,
+                onRemoveDownload = { onRemoveDownload(it, false) },
+                onHide = { onRemoveFromLibrary(it, false) },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomInset + 96.dp),
+            )
         }
     }
 
@@ -2504,10 +2513,12 @@ internal fun BookCard(
 ) {
     val haptics = LocalHapticFeedback.current
     val state = bookStateDescription(book, progress)
+    val selecting by LiburuSelection.active.collectAsState()
+    val chosen by LiburuSelection.urls.collectAsState()
     Column(
         modifier = modifier
             .combinedClickable(
-                onClick = onClick,
+                onClick = { if (selecting) LiburuSelection.toggle(book.url) else onClick() },
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLongClick()
@@ -2540,6 +2551,7 @@ internal fun BookCard(
             if (book.finished && progress == null) {
                 FinishedBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
             }
+            if (selecting) LiburuSelectionMark(book.url in chosen, Modifier.align(Alignment.TopEnd).padding(6.dp))
             // Only a search shows an archived book among others, and
             // the corner left free by the rest says so.
             if (book.archived && progress == null) {

@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
@@ -153,6 +154,7 @@ internal fun LiburuControls(
 
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinePill("Seleccionar", Icons.Outlined.Check) { LiburuSelection.start() }
             OutlinePill(stringResource(R.string.liburu_lib_refresh), Icons.Outlined.Refresh, actions.onRefresh)
             var addOpen by remember { mutableStateOf(false) }
             Box {

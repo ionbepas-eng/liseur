@@ -263,6 +263,7 @@ internal fun LiburuHome(
                 }
             }
         }
+        item(key = "lh:news") { LiburuNewsRow() }
         item(key = "lh:goals") {
             GoalsCard(
                 rhythm = rhythm,

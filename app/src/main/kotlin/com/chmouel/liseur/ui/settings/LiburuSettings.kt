@@ -110,6 +110,46 @@ internal fun LiburuSettings() {
             )
         }
     }
+    LiburuNewsSettings()
+}
+
+@Composable
+internal fun LiburuNewsSettings() {
+    val context = LocalContext.current
+    var feeds by remember { mutableStateOf(com.chmouel.liseur.ui.library.styles.LiburuNews.feeds(context)) }
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    SettingsGroup("Actualidad literaria") {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Noticias y reseñas que aparecen en Inicio. Añade cualquier feed RSS de una revista, blog o sección de cultura.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            feeds.forEach { feed ->
+                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(feed.first, style = MaterialTheme.typography.titleSmall)
+                        Text(feed.second, style = MaterialTheme.typography.bodySmall, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.OutlinedButton(onClick = {
+                        feeds = feeds - feed
+                        com.chmouel.liseur.ui.library.styles.LiburuNews.setFeeds(context, feeds)
+                    }) { Text("Quitar") }
+                }
+            }
+            OutlinedTextField(name, { name = it }, label = { Text("Nombre (p. ej. El Cultural)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(url, { url = it }, label = { Text("https://…/rss") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            androidx.compose.material3.Button(
+                enabled = url.trim().startsWith("http"),
+                onClick = {
+                    feeds = feeds + ((name.trim().ifEmpty { android.net.Uri.parse(url.trim()).host ?: "Feed" }) to url.trim())
+                    com.chmouel.liseur.ui.library.styles.LiburuNews.setFeeds(context, feeds)
+                    name = ""; url = ""
+                },
+            ) { Text("Añadir") }
+        }
+    }
 }
 
 @Composable

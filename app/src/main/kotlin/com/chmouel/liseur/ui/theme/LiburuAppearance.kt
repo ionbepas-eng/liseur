@@ -156,8 +156,9 @@ internal fun ColorScheme.liburu(look: LiburuLook, dark: Boolean): ColorScheme {
             background = Color.Transparent,
             surface = Color.Transparent,
             surfaceContainerLowest = paper.copy(alpha = 0.55f),
-            surfaceContainerLow = paper.copy(alpha = 0.62f),
-            surfaceContainer = paper.copy(alpha = 0.7f),
+            // Sheets and menus are drawn on these: they must hide what lies under them.
+            surfaceContainerLow = paper,
+            surfaceContainer = paper.copy(alpha = 0.98f),
             surfaceContainerHigh = paper.copy(alpha = 0.92f),
             surfaceContainerHighest = paper.copy(alpha = 0.96f),
             surfaceVariant = paper.copy(alpha = 0.6f),

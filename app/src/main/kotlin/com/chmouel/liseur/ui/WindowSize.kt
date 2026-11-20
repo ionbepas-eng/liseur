@@ -89,7 +89,7 @@ fun contentWidthCap(width: Dp): Dp = when (widthClassOf(width)) {
  */
 fun coverMinSize(width: Dp): Dp = when (widthClassOf(width)) {
     WidthClass.COMPACT -> 108.dp
-    WidthClass.MEDIUM -> 132.dp
+    WidthClass.MEDIUM -> 116.dp
     WidthClass.EXPANDED -> 156.dp
 }
 

@@ -160,102 +160,43 @@ internal fun SeriesStackCard(
             )
             .semantics(mergeDescendants = true) { stateDescription = description },
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Room to the right and below for the pile to stand in,
-                // so the fan is drawn beside the cover rather than over
-                // the card next to it.
-                .aspectRatio(2f / 3f * 0.92f),
-        ) {
-            // The volumes the pile is made of, peeking out behind the
-            // front cover: their real artwork, furthest first, each
-            // faded towards the surface so the front cover stays the
-            // loudest thing on the card. Insets rather than rotations: a
-            // fan of tilted covers looks like a mistake at this size,
-            // and a stepped pile reads instantly.
-            val backers = shelf.volumes
-                .map { it.book }
-                .filter { it.id != shelf.cover.id }
-                .take(2)
-            val shape = RoundedCornerShape(10.dp)
-            val surface = MaterialTheme.colorScheme.surface
-            repeat(2) { layer ->
-                val depth = (2 - layer)
-                val backer = backers.getOrNull(depth - 1)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = (depth * 5).dp, bottom = (depth * 5).dp)
-                        .padding(start = (10 - depth * 5).dp, top = (10 - depth * 5).dp)
-                        .clip(shape)
-                        .background(
-                            if (eInk) Color.Transparent
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                        )
-                        .border(
-                            BorderStroke(1.dp, outline.copy(alpha = if (eInk) 0.9f else 0.5f)),
-                            shape,
-                        ),
-                ) {
-                    // On e-paper the pile stays an outline: the fade
-                    // relies on translucency, which sixteen greys and no
-                    // compositing to speak of turn into smudge.
-                    if (backer != null && !eInk) {
-                        BookCover(book = backer, modifier = Modifier.fillMaxSize())
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    surface.copy(alpha = if (depth == 2) 0.55f else 0.35f),
-                                ),
-                        )
-                    }
-                }
+        if (eInk) {
+            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
+                BookCover(book = shelf.cover, modifier = Modifier.fillMaxSize().border(BorderStroke(1.dp, outline), RoundedCornerShape(10.dp)))
+                SeriesCountBadge(count = shelf.volumes.size, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
             }
-            BookCover(
-                book = shelf.cover,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(end = 10.dp, bottom = 10.dp)
-                    .alpha(if (shelf.complete) 0.55f else 1f),
-            )
-            SeriesCountBadge(
-                count = shelf.volumes.size,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = 6.dp),
-            )
+        } else {
+            // As the web: two volumes, the next one in front and the one before it
+            // peeking out above and to the left, in the same box as a single cover
+            // so rows of the grid line up.
+            val back = shelf.volumes.map { it.book }.firstOrNull { it.id != shelf.cover.id }
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
+                val step = maxWidth * 0.12f
+                back?.let {
+                    BookCover(book = it, modifier = Modifier.fillMaxSize().padding(end = step, bottom = step * 1.5f))
+                }
+                BookCover(
+                    book = shelf.cover,
+                    modifier = Modifier.fillMaxSize().padding(start = if (back != null) step else 0.dp, top = if (back != null) step * 1.5f else 0.dp)
+                        .alpha(if (shelf.complete) 0.6f else 1f),
+                )
+            }
         }
-        SeriesProgressRail(
-            shelf = shelf,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp, end = 10.dp),
-        )
-        Column(
-            modifier = Modifier
-                .padding(top = 6.dp)
-                .heightIn(min = 56.dp),
-        ) {
+        val read = shelf.volumes.count { it.finished }
+        Column(modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp)) {
+            Text(
+                text = if (read > 0) "Has terminado $read de ${shelf.volumes.size}" else "${shelf.volumes.size} libros",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
             Text(
                 text = shelf.name,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 18.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            shelf.author?.let {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
     }
 }

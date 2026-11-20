@@ -818,11 +818,18 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
         val next = a.tiers.getOrNull(tier)
         AlertDialog(
             onDismissRequest = { open = null },
-            title = { Text("${a.glyph}  ${a.name}") },
+            title = null,
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Badge(a, tier, 150.dp)
+                    Text(badgeTitle(a, tier), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     a.tiers.forEachIndexed { i, t ->
-                        Text((if (v >= t) "✓ " else "○ ") + (if (a.tiers.size > 1) "${TIER_NAMES[i]}: " else "") + a.desc(t), color = if (v >= t) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth().background(if (v >= t) Paper else Color.Transparent, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            Text((if (a.tiers.size > 1) "${TIER_NAMES[i]} · " else "") + a.desc(t), modifier = Modifier.weight(1f),
+                                fontWeight = if (v >= t) FontWeight.SemiBold else FontWeight.Normal,
+                                color = if (v >= t) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (v >= t) Text("✓")
+                        }
                     }
                     next?.let { Text("Llevas ${fmtNum(v)} de ${fmtNum(it)}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
@@ -1040,28 +1047,30 @@ private fun RetosCard(data: StatsData, zone: ZoneId) {
     Card {
         Text("Retos de $month", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
         Text("Se ajustan a tu ritmo de los últimos meses", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        calc.list.forEach { r ->
-            val v = calc.progress(r)
-            val done = v >= r.target
-            val days = ((r.to - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
-            Column(Modifier.fillMaxWidth().then(if (r.auto) Modifier else Modifier.clickable { editing = r }), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(retoTitle(r, data), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    if (done) Box(Modifier.size(30.dp).background(Color(0xFF5A9C5A), CircleShape), contentAlignment = Alignment.Center) { Text("✓", color = Color.White, fontWeight = FontWeight.Bold) }
-                    else Text("${fmtNum(v)} / ${fmtNum(r.target)}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Box(Modifier.fillMaxWidth().height(10.dp).background(Paper, CircleShape)) {
-                    if (v > 0) Box(Modifier.fillMaxWidth((v / r.target).toFloat().coerceIn(0.02f, 1f)).fillMaxHeight().background(if (done) Color(0xFF5A9C5A) else MaterialTheme.colorScheme.primary, CircleShape))
-                }
-                Text((if (r.auto) "Reto del mes" else "Tu reto") + " · " + if (done) "¡Conseguido!" else "quedan $days días",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        calc.list.forEach { r -> RetoRow(r, calc.progress(r), data) { editing = r } }
         androidx.compose.material3.OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
             Text("＋ Crear un reto", style = MaterialTheme.typography.titleMedium)
         }
     }
     if (creating || editing != null) RetoDialog(data, editing) { creating = false; editing = null }
+}
+
+@Composable
+private fun RetoRow(r: Reto, v: Double, data: StatsData, onEdit: () -> Unit) {
+    val done = v >= r.target
+    val days = ((r.to - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
+    Column(Modifier.fillMaxWidth().then(if (r.auto) Modifier else Modifier.clickable(onClick = onEdit)), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(retoTitle(r, data), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (done) Box(Modifier.size(30.dp).background(Color(0xFF5A9C5A), CircleShape), contentAlignment = Alignment.Center) { Text("✓", color = Color.White, fontWeight = FontWeight.Bold) }
+            else Text("${fmtNum(v)} / ${fmtNum(r.target)}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box(Modifier.fillMaxWidth().height(10.dp).background(Paper, CircleShape)) {
+            if (v > 0) Box(Modifier.fillMaxWidth((v / r.target).toFloat().coerceIn(0.02f, 1f)).fillMaxHeight().background(if (done) Color(0xFF5A9C5A) else MaterialTheme.colorScheme.primary, CircleShape))
+        }
+        Text((if (r.auto) "Reto del mes" else "Tu reto") + " · " + if (done) "¡Conseguido!" else "quedan $days días",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -1160,27 +1169,30 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
     val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
     val next = LEVELS.getOrNull(li + 1)
     val pct = next?.let { ((xp - LEVELS[li].first) / (it.first - LEVELS[li].first)).toFloat() } ?: 1f
-    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-        androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item { TextButton(onClick = onClose) { Text("‹ Estadísticas") } }
-                item { Text("Logros", style = MaterialTheme.typography.displaySmall) }
-                item { LevelCard(values) }
-                item { Text("Retos", style = MaterialTheme.typography.headlineSmall) }
-                items(retos, key = { it.id }) { r ->
-                    val v = progress(r)
-                    val days = ((r.to - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
-                    Card {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (v >= r.target) "✅" else "🚩", fontSize = 22.sp)
-                            Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                                Text(retoTitle(r, data), style = MaterialTheme.typography.titleMedium)
-                                Text("${fmtNum(minOf(v, r.target.toDouble()))} / ${fmtNum(r.target.toDouble())} · ${if (v >= r.target) "conseguido" else "quedan $days días"}${if (r.auto) "" else " · tuyo"}",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                androidx.compose.material3.LinearProgressIndicator(progress = { (v / r.target).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), drawStopIndicator = {})
-                            }
+    var editing by remember { mutableStateOf<Reto?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    val look by com.chmouel.liseur.ui.theme.LiburuAppearance.look.collectAsState()
+    val wall = com.chmouel.liseur.ui.theme.LiburuAppearance.wallpaper(look)
+    val bgColor = MaterialTheme.colorScheme.background.copy(alpha = 1f)
+    val doneTotal = remember(retos) { retos.count { progress(it) >= it.target } + com.chmouel.liseur.data.gdrive.LiburuShared.retos(context, null).count { it.optLong("to") <= System.currentTimeMillis() } }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(bgColor).then(if (wall != null) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(wall.colors)) else Modifier)) {
+            LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.statusBarsPadding()) {
+                item { TextButton(onClick = onClose, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 12.dp)) { Text("‹ Estadísticas", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface) } }
+                item { Text("Logros", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold) }
+                item { LevelCard(values, page = true) }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Text("Retos", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.Button(onClick = { creating = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = Paper)) {
+                            Text("＋ Crear reto", style = MaterialTheme.typography.titleMedium)
                         }
                     }
+                }
+                items(retos, key = { it.id }) { r -> Card { RetoRow(r, progress(r), data) { editing = r } } }
+                item {
+                    Text("Retos completados en total: $doneTotal. " + if (retos.any { !it.auto }) "Toca uno de tus retos para editarlo." else "Crea tus propios retos: páginas, minutos, libros, días… o terminar un libro concreto antes de una fecha.",
+                        style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 item {
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -1217,6 +1229,7 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
                     }
                 }
             }
+            if (creating || editing != null) RetoDialog(data, editing) { creating = false; editing = null }
         }
     }
 }
@@ -1243,11 +1256,11 @@ private fun levelOf(values: Map<String, Double>): Triple<Int, Double, Pair<Int, 
 
 /** «Tu nivel», as on the web. */
 @Composable
-private fun LevelCard(values: Map<String, Double>) {
+private fun LevelCard(values: Map<String, Double>, page: Boolean = false) {
     val (li, xp, next) = levelOf(values)
     val pct = next?.let { ((xp - LEVELS[li].first) / (it.first - LEVELS[li].first)).toFloat() } ?: 1f
     Card {
-        Text("Tu nivel", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        if (!page) Text("Tu nivel", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(104.dp).background(MaterialTheme.colorScheme.onSurface, CircleShape), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1264,6 +1277,13 @@ private fun LevelCard(values: Map<String, Double>) {
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text("Sumas puntos por cada página, cada libro terminado (100) y cada logro (50).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (page) androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LEVELS.forEachIndexed { i, (pts, n) ->
+                val on = i <= li
+                Box(Modifier.size(42.dp).background(if (on) MaterialTheme.colorScheme.onSurface else Paper, CircleShape), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = if (on) Paper else MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        } else Text("Sumas puntos por cada página, cada libro terminado (100) y cada logro (50).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

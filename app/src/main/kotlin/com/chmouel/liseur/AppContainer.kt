@@ -1040,6 +1040,7 @@ class AppContainer(
                 inTransaction = { work -> database.withTransaction { work() } },
             ),
             annotations = annotationBackup,
+            bookDao = database.bookDao(),
         )
     }
 

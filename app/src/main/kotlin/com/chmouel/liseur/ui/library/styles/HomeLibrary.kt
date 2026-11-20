@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.Button
@@ -388,11 +389,27 @@ internal fun QuoteCard(
                             )
                         }
                     }
+                    val shareContext = androidx.compose.ui.platform.LocalContext.current
                     Surface(
                         shape = CircleShape,
                         color = palette?.card?.copy(alpha = 0.7f) ?: Color.Transparent,
                         border = BorderStroke(1.dp, palette?.cardBorder ?: MaterialTheme.colorScheme.outline),
                         modifier = Modifier.padding(start = 12.dp).size(38.dp),
+                    ) {
+                        IconButton(onClick = { QuoteShare.share(shareContext, quote) }) {
+                            Icon(
+                                Icons.Outlined.IosShare,
+                                contentDescription = stringResource(R.string.liburu_share_quote),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = palette?.card?.copy(alpha = 0.7f) ?: Color.Transparent,
+                        border = BorderStroke(1.dp, palette?.cardBorder ?: MaterialTheme.colorScheme.outline),
+                        modifier = Modifier.padding(start = 8.dp).size(38.dp),
                     ) {
                         IconButton(onClick = onAnother) {
                             Icon(

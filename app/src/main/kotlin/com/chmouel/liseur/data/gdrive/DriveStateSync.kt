@@ -41,6 +41,7 @@ class DriveStateSync(
     private val progressDao: ReadingProgressDao,
     private val positions: ReadingPositionBackupRepository,
     private val annotations: AnnotationBackupRepository,
+    private val bookDao: com.chmouel.liseur.data.db.BookDao,
     private val http: OkHttpClient = DriveAuth.client(),
 ) {
     private val app = context.applicationContext
@@ -90,7 +91,7 @@ class DriveStateSync(
      * (name and photo) are merged both ways, newest change winning, and every
      * other part of the file is left exactly as the web wrote it.
      */
-    private fun syncSharedProfile() {
+    private suspend fun syncSharedProfile() {
         val url = "${DriveAuth.BASE_URL}/files".toHttpUrl().newBuilder()
             .addQueryParameter("spaces", "appDataFolder")
             .addQueryParameter("q", "name='state.json' and trashed=false")
@@ -155,6 +156,8 @@ class DriveStateSync(
             changed = true
         }
 
+        if (syncBooks(state)) changed = true
+
         if (!changed) return
         state.put("updated", System.currentTimeMillis())
         val json = "application/json".toMediaType()
@@ -188,6 +191,78 @@ class DriveStateSync(
             val drive = contents.books.filter { it.bookId.startsWith(DRIVE_URL) }
             if (drive.isNotEmpty()) annotations.importContents(BackupContents.Readable(drive))
         }
+    }
+
+    /**
+     * Book status, dates and how far through, against the web's `books` map
+     * (keyed `g:<Drive id>`; here `gdrive:<Drive id>`). The web's exact place
+     * is an EPUB CFI this reader cannot use, so the fraction travels instead.
+     */
+    private suspend fun syncBooks(state: JSONObject): Boolean {
+        val books = state.optJSONObject("books") ?: JSONObject().also { state.put("books", it) }
+        val pulls = mutableListOf<com.chmouel.liseur.domain.BackedUpReadingPosition>()
+        var changed = false
+        for (book in bookDao.allOnce()) {
+            if (!book.url.startsWith(DRIVE_URL)) continue
+            val webId = "g:" + book.url.removePrefix(DRIVE_URL)
+            val web = books.optJSONObject(webId)
+            val pos = web?.optJSONObject("pos")
+            val meta = web?.optJSONObject("meta")
+            val webAt = maxOf(pos?.optLong("t") ?: 0L, meta?.optLong("t") ?: 0L)
+            val local = progressDao.get(book.url)
+            val localAt = local?.updatedAt ?: 0L
+            if (web != null && webAt > localAt + 2_000) {
+                val fraction = pos?.optDouble("fraction")?.takeIf { it.isFinite() && it in 0.0..1.0 }
+                val status = when (meta?.optString("status")) {
+                    "finished" -> "finished"
+                    "dropped" -> "did_not_finish"
+                    "want" -> "want_to_read"
+                    "reading" -> if (fraction == null) "reading" else null
+                    else -> null
+                }
+                if (fraction != null || status != null) {
+                    pulls += com.chmouel.liseur.domain.BackedUpReadingPosition(
+                        bookId = book.url,
+                        title = book.title,
+                        author = book.author,
+                        locatorJson = "{}",
+                        progression = fraction,
+                        readAt = webAt,
+                        readingStatus = status,
+                    )
+                }
+            } else if (local != null && localAt > webAt + 2_000) {
+                val entry = web ?: JSONObject().put("bookId", webId).put("ann", JSONObject())
+                val progression = local.totalProgression?.takeIf { it.isFinite() }
+                if (progression != null && progression > 0) {
+                    val oldFraction = pos?.optDouble("fraction") ?: -1.0
+                    entry.put(
+                        "pos",
+                        JSONObject()
+                            .put("cfi", if (kotlin.math.abs(oldFraction - progression) < 0.001) pos?.optString("cfi").orEmpty() else "")
+                            .put("fraction", progression)
+                            .put("t", localAt)
+                            .put("device", "android-$deviceId"),
+                    )
+                }
+                val status = when {
+                    book.finishedAt != null || local.override == com.chmouel.liseur.domain.FinishedOverride.FINISHED -> "finished"
+                    local.override == com.chmouel.liseur.domain.FinishedOverride.DID_NOT_FINISH -> "dropped"
+                    local.override == com.chmouel.liseur.domain.FinishedOverride.WANT_TO_READ -> "want"
+                    (progression ?: 0.0) > 0 -> "reading"
+                    else -> meta?.optString("status")?.takeIf { it.isNotEmpty() } ?: "none"
+                }
+                val newMeta = (meta ?: JSONObject()).put("status", status).put("t", localAt)
+                if (status == "finished" && !newMeta.has("finishedAt")) newMeta.put("finishedAt", book.finishedAt ?: localAt)
+                if (status == "reading" && !newMeta.has("startedAt")) newMeta.put("startedAt", localAt)
+                entry.put("meta", newMeta)
+                books.put(webId, entry)
+                changed = true
+            }
+        }
+        if (pulls.isNotEmpty()) runCatching { positions.restore(pulls) }
+            .onFailure { Log.i(TAG, "an open book waits for the next sync") }
+        return changed
     }
 
     private suspend fun exportPositions(): String {

@@ -281,7 +281,7 @@ fun LibraryScreen(
     // Which cut of the reading mark to draw.  Asked of the scheme in
     // force rather than of the resource qualifiers, so it follows the
     // app's own dark setting even when the system disagrees.
-    val darkMark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val darkMark = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
     // The bar shows the illustration at the size the window can afford.
     val barWidth = windowWidth()
     val tileHeight = brandTileHeight(barWidth)

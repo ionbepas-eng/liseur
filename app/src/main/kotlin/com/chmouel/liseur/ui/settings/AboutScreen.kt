@@ -243,7 +243,7 @@ fun AboutScreen(
 
 @Composable
 private fun LogoBlock(modifier: Modifier = Modifier) {
-    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val isDark = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,

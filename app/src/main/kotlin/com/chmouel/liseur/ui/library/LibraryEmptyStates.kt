@@ -299,7 +299,7 @@ internal fun EmptyLibrary(
     // Which cut of the mark to draw is asked of the theme in force
     // here, not of a -night qualifier: those follow the system, and the
     // app's own light/dark setting is allowed to disagree.
-    val darkMark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val darkMark = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
     LibraryEmptyState(
         title = stringResource(R.string.empty_library_title),
         subtitle = stringResource(R.string.empty_library_subtitle),

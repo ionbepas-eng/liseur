@@ -89,7 +89,8 @@ val DarkHomePalette = HomePalette(
 @Composable
 fun homePalette(): HomePalette? {
     if (LocalEInk.current) return null
-    val base = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) DarkHomePalette else LightHomePalette
+    // Judged by the ink, not the surface: with a wallpaper the surface is clear.
+    val base = if (MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) DarkHomePalette else LightHomePalette
     // Liburuville: the chosen accent leads the tab bar and the progress bars.
     val primary = MaterialTheme.colorScheme.primary
     val accent = com.chmouel.liseur.ui.theme.LiburuAppearance.accentColor(

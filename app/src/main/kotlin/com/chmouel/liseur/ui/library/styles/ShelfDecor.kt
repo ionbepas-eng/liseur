@@ -117,7 +117,7 @@ internal fun rememberShelfArt(
     tone: ShelfTone = ShelfTone.Default,
 ): ShelfArt {
     val scheme = MaterialTheme.colorScheme
-    val dark = scheme.surface.luminance() < 0.5f
+    val dark = scheme.onSurface.luminance() > 0.5f
     val wall = when (backdrop) {
         ShelfBackdrop.BRICKS -> ImageBitmap.imageResource(R.drawable.shelf_wall)
         ShelfBackdrop.WOOD -> ImageBitmap.imageResource(R.drawable.shelf_wall_wood)

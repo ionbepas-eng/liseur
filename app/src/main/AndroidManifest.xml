@@ -79,6 +79,16 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.quotes"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/liburu_share_paths" />
+        </provider>
+
         <activity
             android:name=".data.gdrive.DriveAuthActivity"
             android:exported="true"

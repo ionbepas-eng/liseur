@@ -15,16 +15,20 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  * «Añadir a mi biblioteca» downloads through Liseur's own browse path.
  */
 object LiburuClassics {
-    val SOURCES = listOf(FreeCatalog.TEXTOS_INFO, FreeCatalog.GUTENBERG, FreeCatalog.MANYBOOKS)
-    private val cache = HashMap<FreeCatalog, List<RemoteBook>>()
+    /** One row of Descubrir: a saved catalog and the shelf of it to show. */
+    data class Source(val key: String, val name: String, val catalog: FreeCatalog, val shelf: String)
+
+    // ManyBooks answers apps with a Cloudflare challenge, so textos.info
+    // gives a second row instead.
+    val SOURCES = listOf(
+        Source("textos-populares", "textos.info · Más populares", FreeCatalog.TEXTOS_INFO, "https://www.textos.info/populares.atom"),
+        Source("textos-novedades", "textos.info · Novedades", FreeCatalog.TEXTOS_INFO, "https://www.textos.info/novedades.atom"),
+        Source("gutenberg-es", "Project Gutenberg", FreeCatalog.GUTENBERG, "gutenberg:shelf:es:POPULAR"),
+    )
+    private val cache = HashMap<String, List<RemoteBook>>()
     private val ids = HashMap<FreeCatalog, Long>()
 
-    fun name(source: FreeCatalog) = when (source) {
-        FreeCatalog.GUTENBERG -> "Project Gutenberg"
-        FreeCatalog.TEXTOS_INFO -> "textos.info"
-        FreeCatalog.MANYBOOKS -> "ManyBooks"
-        FreeCatalog.GALLICA -> "Gallica"
-    }
+    fun byKey(key: String) = SOURCES.firstOrNull { it.key == key } ?: SOURCES.first()
 
     suspend fun serverId(context: Context, source: FreeCatalog): Long? = ids[source] ?: withContext(Dispatchers.IO) {
         val c = context.container
@@ -34,27 +38,23 @@ object LiburuClassics {
     }
 
     /** About fifteen books to start from, cached for the session. */
-    suspend fun books(context: Context, source: FreeCatalog, fresh: Boolean = false): List<RemoteBook> {
-        if (!fresh) cache[source]?.let { return it }
-        val id = serverId(context, source) ?: return emptyList()
+    suspend fun books(context: Context, row: Source, fresh: Boolean = false): List<RemoteBook> {
+        if (!fresh) cache[row.key]?.let { return it }
+        val id = serverId(context, row.catalog) ?: return emptyList()
         val repo = context.container.browseCatalog
         val found = runCatching {
-            var listing = if (source == FreeCatalog.GUTENBERG) {
-                repo.listing(id, categoryId = "gutenberg:shelf:es:POPULAR")
-            } else {
-                repo.listing(id)
-            }
+            var listing = repo.listing(id, categoryId = row.shelf)
             if (listing.books.size < 5 && listing.categories.isNotEmpty()) {
                 val pick = listing.categories.firstOrNull { PREFERRED.containsMatchIn(it.title) } ?: listing.categories.first()
                 listing = repo.listing(id, categoryId = pick.id)
             }
             val all = listing.books.toMutableList()
             listing.nextPage?.takeIf { all.size < 15 }?.let { page ->
-                all += runCatching { repo.listing(id, categoryId = null, page = page).books }.getOrDefault(emptyList())
+                all += runCatching { repo.listing(id, categoryId = row.shelf, page = page).books }.getOrDefault(emptyList())
             }
             all.filter { it.downloadHref != null }.distinctBy { it.remoteId }.take(15)
         }.getOrDefault(emptyList())
-        if (found.isNotEmpty()) cache[source] = found
+        if (found.isNotEmpty()) cache[row.key] = found
         return found
     }
 

@@ -97,7 +97,7 @@ fun DiscoverScreen(
         suggestions(context, books, progressions, rated.toSet(), strNext, strAuthor, strShelf, strBook)
     }
     openList?.let { name ->
-        val source = FreeCatalog.valueOf(name)
+        val source = LiburuClassics.byKey(name)
         BackHandler { openList = null }
         ClassicsList(source, bottomBarSpace) { openList = null }
         return
@@ -123,8 +123,8 @@ fun DiscoverScreen(
         }
         item { Section(R.string.liburu_dc_classics, R.string.liburu_dc_classics_sub) }
         LiburuClassics.SOURCES.forEach { source ->
-            item(key = "src:" + source.name) {
-                ClassicsRow(source) { openList = source.name }
+            item(key = "src:" + source.key) {
+                ClassicsRow(source) { openList = source.key }
             }
         }
         item { LiburuNewsRow(Modifier.padding(top = 24.dp)) }
@@ -188,7 +188,7 @@ private fun LibraryRow(picks: List<Pick>, onOpen: (Book) -> Unit) {
 }
 
 @Composable
-private fun ClassicsRow(source: FreeCatalog, onMore: () -> Unit) {
+private fun ClassicsRow(source: LiburuClassics.Source, onMore: () -> Unit) {
     val context = LocalContext.current
     var attempt by remember { mutableStateOf(0) }
     val books by produceState<List<RemoteBook>?>(null, source, attempt) {
@@ -197,7 +197,7 @@ private fun ClassicsRow(source: FreeCatalog, onMore: () -> Unit) {
     }
     Column(Modifier.padding(bottom = 18.dp)) {
         Text(
-            LiburuClassics.name(source),
+            source.name,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = 20.dp, bottom = 10.dp),
@@ -244,11 +244,11 @@ private fun ClassicsRow(source: FreeCatalog, onMore: () -> Unit) {
 private fun onInk(): Color = if (MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) Color(0xFF111111) else Color.White
 
 @Composable
-private fun RemoteCover(source: FreeCatalog, book: RemoteBook, modifier: Modifier) {
+private fun RemoteCover(source: LiburuClassics.Source, book: RemoteBook, modifier: Modifier) {
     val shape = RoundedCornerShape(6.dp)
     Box(modifier.shadow(6.dp, shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
         Text(book.title, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(8.dp), maxLines = 4)
-        LiburuClassics.coverUrl(source, book)?.let {
+        LiburuClassics.coverUrl(source.catalog, book)?.let {
             AsyncImage(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
@@ -256,11 +256,11 @@ private fun RemoteCover(source: FreeCatalog, book: RemoteBook, modifier: Modifie
 
 /** The ~15 books of one source as the web lists them, each with its «Añadir». */
 @Composable
-private fun ClassicsList(source: FreeCatalog, bottomBarSpace: Dp, onBack: () -> Unit) {
+private fun ClassicsList(source: LiburuClassics.Source, bottomBarSpace: Dp, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val books by produceState<List<RemoteBook>?>(null, source) { value = LiburuClassics.books(context, source) }
-    val serverId by produceState<Long?>(null, source) { value = LiburuClassics.serverId(context, source) }
+    val serverId by produceState<Long?>(null, source) { value = LiburuClassics.serverId(context, source.catalog) }
     val owned by remember(serverId) {
         serverId?.let { context.container.browseCatalog.observeOwned(it) } ?: flowOf(emptyMap())
     }.collectAsState(emptyMap())
@@ -268,7 +268,7 @@ private fun ClassicsList(source: FreeCatalog, bottomBarSpace: Dp, onBack: () -> 
         item {
             Row(Modifier.statusBarsPadding().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
-                Text(LiburuClassics.name(source), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Text(source.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             }
             Text(
                 stringResource(R.string.liburu_dc_classics_sub),

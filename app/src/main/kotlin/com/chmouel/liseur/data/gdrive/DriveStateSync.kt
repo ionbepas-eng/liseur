@@ -181,6 +181,7 @@ class DriveStateSync(
         val hadShelfEdits = com.chmouel.liseur.ui.library.LiburuShelves.applyPending(app, state)
         if (hadShelfEdits) changed = true
         if (LiburuShared.mergeVocab(app, state)) changed = true
+        if (LiburuShared.mergeWishlist(app, state)) changed = true
         val hadAnn = LiburuShared.applyAnnotations(app, state)
         if (hadAnn) changed = true
 

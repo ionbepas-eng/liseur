@@ -2566,18 +2566,26 @@ internal fun BookCard(
                 )
             }
         }
-        // Liburuville: as on the web, how far in and a «…» for the actions.
+        // Liburuville: as on the web, the book's state and «…», then title and author.
         if (!LocalEInk.current && highlight.isNullOrBlank()) {
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                val pct = when {
-                    book.finished -> 100
-                    else -> ((progression ?: 0.0) * 100).toInt()
+            if (inASeries) book.seriesIndex?.let { i ->
+                Text("Libro ${if (i % 1.0 == 0.0) i.toInt().toString() else i.toString()}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val p = progression ?: 0.0
+                val isNew = !book.finished && p <= 0.004 && System.currentTimeMillis() - book.addedAt < 14L * 86_400_000L
+                when {
+                    book.finished -> Text("✓ Leído", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    p > 0.004 -> Text("${(p * 100).toInt()} %", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    isNew -> Text("NUEVO", style = MaterialTheme.typography.labelMedium, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    else -> Spacer(Modifier.weight(1f))
                 }
-                Text("$pct %", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                IconButton(onClick = onLongClick, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = onLongClick, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Outlined.MoreHoriz, contentDescription = stringResource(R.string.book_actions), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            Text(book.displayTitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            book.displayAuthor?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             return@Column
         }
         // The actions are a long press away, as on every other cover,

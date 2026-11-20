@@ -96,6 +96,19 @@ fun DiscoverScreen(
     val (picks, series) = remember(books, progressions, rated) {
         suggestions(context, books, progressions, rated.toSet(), strNext, strAuthor, strShelf, strBook)
     }
+    val netRows by produceState<List<LiburuDiscoverNet.Row>?>(null, books.size, rated.size) {
+        value = runCatching { LiburuDiscoverNet.rows(context, books, rated.toSet()) }.getOrDefault(emptyList())
+    }
+    val wishVersion by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val wish = remember(wishVersion) { com.chmouel.liseur.data.gdrive.LiburuShared.wishlist(context) }
+    var ext by remember { mutableStateOf<LiburuDiscoverNet.Ext?>(null) }
+    var wishOpen by rememberSaveable { mutableStateOf(false) }
+    ext?.let { e -> ExtSheet(e) { ext = null } }
+    if (wishOpen) {
+        BackHandler { wishOpen = false }
+        WishlistScreen(wish, bottomBarSpace, { ext = it }) { wishOpen = false }
+        return
+    }
     openList?.let { name ->
         val source = LiburuClassics.byKey(name)
         BackHandler { openList = null }
@@ -120,6 +133,27 @@ fun DiscoverScreen(
         if (series.isNotEmpty()) {
             item { Section(R.string.liburu_dc_series, R.string.liburu_dc_series_sub) }
             item { LibraryRow(series, onOpenBook) }
+        }
+        netRows?.forEach { row ->
+            item(key = "net:" + row.title) {
+                Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 14.dp)) {
+                    Text(row.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                    Text(row.sub, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            item(key = "netrow:" + row.title) { ExtRow(row.items) { ext = it } }
+        }
+        if (netRows == null) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { BusyIndicator() } }
+        if (wish.isNotEmpty()) {
+            item(key = "wish") {
+                Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 14.dp).clickable { wishOpen = true }, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Me interesa ›", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Tu lista de deseos", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            item(key = "wishrow") { ExtRow(wish.map { w -> wishToExt(w) }) { ext = it } }
         }
         item { Section(R.string.liburu_dc_classics, R.string.liburu_dc_classics_sub) }
         LiburuClassics.SOURCES.forEach { source ->
@@ -322,6 +356,98 @@ private fun ClassicsList(source: LiburuClassics.Source, bottomBarSpace: Dp, onBa
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+private fun wishToExt(w: org.json.JSONObject) = LiburuDiscoverNet.Ext(
+    w.optString("key"), w.optString("title"), w.optString("author"), w.optString("year"), w.optString("cover"),
+    w.optString("link"), w.optString("desc"), w.optString("author"),
+)
+
+@Composable
+private fun ExtCover(e: LiburuDiscoverNet.Ext, modifier: Modifier) {
+    val shape = com.chmouel.liseur.ui.library.LiburuCoverShape
+    Box(modifier.shadow(6.dp, shape).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+        Text(e.title, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(8.dp), maxLines = 4)
+        if (e.cover.isNotEmpty()) AsyncImage(e.cover, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun ExtRow(list: List<LiburuDiscoverNet.Ext>, onOpen: (LiburuDiscoverNet.Ext) -> Unit) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        items(list, key = { it.key }) { e ->
+            Column(Modifier.width(132.dp).clickable { onOpen(e) }) {
+                ExtCover(e, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
+                Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                Text(e.why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** A book from outside the library: what it is, and «Lo quiero leer». */
+@Composable
+private fun ExtSheet(e: LiburuDiscoverNet.Ext, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val v by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+    val wished = remember(v, e.key) { com.chmouel.liseur.data.gdrive.LiburuShared.isWished(context, e.key) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDone,
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row {
+                    ExtCover(e, Modifier.width(96.dp).aspectRatio(2f / 3f))
+                    Column(Modifier.padding(start = 14.dp)) {
+                        Text(e.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text(listOf(e.author, e.year).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (e.desc.isNotBlank()) Text(e.desc, style = MaterialTheme.typography.bodyMedium, maxLines = 10, overflow = TextOverflow.Ellipsis)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    com.chmouel.liseur.data.gdrive.LiburuShared.toggleWish(context, e.json(), !wished)
+                    context.container.applicationScopeLaunch { context.container.driveStateSync.syncNow(force = true) }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = onInk()),
+            ) { Text(if (wished) "✓ En tu lista" else "Lo quiero leer") }
+        },
+        dismissButton = {
+            if (e.link.isNotEmpty()) androidx.compose.material3.TextButton(onClick = {
+                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(e.link))) }
+            }) { Text("Ver en Google Books") }
+        },
+    )
+}
+
+/** «Lista de deseos», as the web's page. */
+@Composable
+private fun WishlistScreen(list: List<org.json.JSONObject>, bottomBarSpace: Dp, onOpen: (LiburuDiscoverNet.Ext) -> Unit, onBack: () -> Unit) {
+    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+        columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(120.dp),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = bottomBarSpace + 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            Column(Modifier.statusBarsPadding().padding(top = 8.dp)) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
+                Text("Lista de deseos", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
+                Text("${list.size} ${if (list.size == 1) "libro" else "libros"} que quieres leer", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        items(list.size) { i ->
+            val e = wishToExt(list[i])
+            Column(Modifier.clickable { onOpen(e) }) {
+                ExtCover(e, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
+                Text(e.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                Text(e.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
     }

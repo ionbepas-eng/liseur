@@ -68,6 +68,46 @@ object LiburuShared {
         return remote
     }
 
+    // --- Wishlist («Me interesa»), the web's `wishlist` ---------------------------------
+    private const val WISH = "liburu-wishlist.json"
+
+    fun wishlist(context: Context): List<JSONObject> {
+        val all = read(context, WISH)
+        return all.keys().asSequence().mapNotNull { all.optJSONObject(it) }.filter { !it.optBoolean("deleted") }.sortedByDescending { it.optLong("t") }.toList()
+    }
+
+    fun isWished(context: Context, key: String) = read(context, WISH).optJSONObject(key)?.let { !it.optBoolean("deleted") } == true
+
+    fun toggleWish(context: Context, item: JSONObject, on: Boolean) {
+        val all = read(context, WISH)
+        val key = item.optString("key")
+        val e = JSONObject()
+        listOf("key", "title", "author", "year", "cover", "link", "source", "desc").forEach { k -> item.opt(k)?.let { e.put(k, it) } }
+        e.put("desc", item.optString("desc").take(600)).put("t", System.currentTimeMillis()).put("deleted", !on)
+        write(context, WISH, all.put(key, e))
+        version.value++
+    }
+
+    fun mergeWishlist(context: Context, state: JSONObject): Boolean = mergeMap(context, WISH, state, "wishlist")
+
+    private fun mergeMap(context: Context, file: String, state: JSONObject, field: String): Boolean {
+        val mine = read(context, file)
+        val theirs = state.optJSONObject(field) ?: JSONObject()
+        var local = false
+        var remote = false
+        theirs.keys().forEach { k ->
+            val r = theirs.optJSONObject(k) ?: return@forEach
+            if (r.optLong("t") > (mine.optJSONObject(k)?.optLong("t") ?: -1L)) { mine.put(k, r); local = true }
+        }
+        mine.keys().forEach { k ->
+            val m = mine.optJSONObject(k) ?: return@forEach
+            if (m.optLong("t") > (theirs.optJSONObject(k)?.optLong("t") ?: -1L)) { theirs.put(k, m); remote = true }
+        }
+        if (local) { write(context, file, mine); version.value++ }
+        if (remote) state.put(field, theirs)
+        return remote
+    }
+
     // --- Annotations added here -------------------------------------------------------
     fun addAnnotations(context: Context, bookKey: String, anns: List<JSONObject>) {
         val p = read(context, ANN_PENDING)

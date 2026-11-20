@@ -163,6 +163,10 @@ interface ReadingSessionDao {
     @Query("SELECT * FROM reading_sessions ORDER BY started_at DESC")
     fun observeAll(): Flow<List<ReadingSession>>
 
+    /** Liburuville: one book's sessions, newest first, for its details page. */
+    @Query("SELECT * FROM reading_sessions WHERE book_url = :bookUrl ORDER BY started_at DESC")
+    fun observeFor(bookUrl: String): Flow<List<ReadingSession>>
+
     @Query("SELECT * FROM reading_sessions ORDER BY id")
     suspend fun allOnce(): List<ReadingSession>
 

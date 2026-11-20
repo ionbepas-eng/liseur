@@ -127,6 +127,11 @@ fun BookDetailsScreen(
         LaunchedEffect(Unit) { onBack() }
     }
     val details = (state as? BookDetailsUiState.Ready)?.details
+    // Liburuville: the web's book page, except on e-ink.
+    if (details != null && !LocalEInk.current) {
+        LiburuBookDetails(details, etaSeconds, canDownload, download, onBack, onRead, onDownload, onOpenStats, onSetReadingChoice, onSetEvaluation)
+        return
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -561,7 +566,7 @@ private fun ReadingStatusCard(
 
 /** The blurb, folded to a few lines when long; it speaks for itself without a heading. */
 @Composable
-private fun Description(
+internal fun Description(
     bookUrl: String,
     text: String,
     modifier: Modifier,
@@ -647,7 +652,7 @@ private fun hasPublication(details: BookDetails): Boolean {
 }
 
 @Composable
-private fun Publication(
+internal fun Publication(
     details: BookDetails,
     modifier: Modifier,
 ) {
@@ -694,7 +699,7 @@ private fun Publication(
  * a reader rarely needs a hash, but the one who does finds it here.
  */
 @Composable
-private fun FileInfo(
+internal fun FileInfo(
     details: BookDetails,
     modifier: Modifier,
 ) {
@@ -946,7 +951,7 @@ private fun provenanceLabel(details: BookDetails): String =
 @Composable
 private fun currentLocale(): Locale = LocalLocale.current.platformLocale
 
-private fun day(
+internal fun day(
     millis: Long,
     locale: Locale,
 ): String =

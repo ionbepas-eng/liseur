@@ -18,17 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.LocalLibrary
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.LocalLibrary
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -134,7 +123,8 @@ fun MainTabBar(
         shape = shape,
         color = palette?.tabBar ?: MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, palette?.tabBarBorder ?: MaterialTheme.colorScheme.outline),
-        shadowElevation = if (eInk) 0.dp else 8.dp,
+        // No elevation: through a see-through bar the shadow would grey it.
+        shadowElevation = 0.dp,
         modifier = modifier
             .navigationBarsPadding()
             .padding(BarMargin)
@@ -220,10 +210,11 @@ private val MainTab.label: Int
         MainTab.SETTINGS -> R.string.settings
     }
 
+@Suppress("UNUSED_PARAMETER")
 private fun MainTab.icon(selected: Boolean): ImageVector = when (this) {
-    MainTab.HOME -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
-    MainTab.LIBRARY -> if (selected) Icons.Filled.LocalLibrary else Icons.Outlined.LocalLibrary
-    MainTab.SERIES -> if (selected) Icons.Filled.Layers else Icons.Outlined.Layers
-    MainTab.STATS -> if (selected) Icons.Filled.BarChart else Icons.Outlined.BarChart
-    MainTab.SETTINGS -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
+    MainTab.HOME -> com.chmouel.liseur.ui.theme.LiburuIcons.Home
+    MainTab.LIBRARY -> com.chmouel.liseur.ui.theme.LiburuIcons.Library
+    MainTab.SERIES -> com.chmouel.liseur.ui.theme.LiburuIcons.Series
+    MainTab.STATS -> com.chmouel.liseur.ui.theme.LiburuIcons.Stats
+    MainTab.SETTINGS -> com.chmouel.liseur.ui.theme.LiburuIcons.Settings
 }

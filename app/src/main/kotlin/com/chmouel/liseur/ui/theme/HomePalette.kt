@@ -96,11 +96,18 @@ fun homePalette(): HomePalette? {
     val accent = com.chmouel.liseur.ui.theme.LiburuAppearance.accentColor(
         com.chmouel.liseur.ui.theme.LiburuAppearance.look.value,
     )
+    // Like the web's bar: the page's paper, see-through, with the ink as the
+    // selected pill and the paper as its label.
+    val scheme = MaterialTheme.colorScheme
+    val paper = scheme.background.takeIf { it.alpha > 0.5f } ?: scheme.surfaceContainerHigh.copy(alpha = 1f)
     return base.copy(
+        tabBar = paper.copy(alpha = 0.84f),
+        tabBarBorder = base.cardBorder,
+        onTab = scheme.onSurfaceVariant,
         accent = accent,
         progress = primary,
-        tabSelected = accent,
-        onTabSelected = if (accent.luminance() > 0.5f) Color(0xFF1B1A17) else Color.White,
+        tabSelected = scheme.onSurface,
+        onTabSelected = paper,
         reading = base.reading.copy(content = primary),
     )
 }

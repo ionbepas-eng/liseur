@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clipToBounds
 import com.chmouel.liseur.data.db.Book
 import com.chmouel.liseur.container
 import androidx.compose.foundation.background
@@ -80,14 +81,14 @@ internal fun ShelvesOverview(
     if (open == null) {
         var organizing by remember { mutableStateOf(false) }
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(170.dp),
+            columns = GridCells.Adaptive(150.dp),
             modifier = modifier,
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = bottomInset + 24.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     androidx.compose.material3.Button(
                         onClick = { organizing = true },
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface),
@@ -232,35 +233,37 @@ internal fun FanCard(books: List<Book>, title: String, subtitle: String, onClick
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Column {
-            Box(
-                Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)).clipToBounds(),
                 contentAlignment = Alignment.Center,
             ) {
-                val shown = books.take(3)
-                val order = when (shown.size) { 3 -> listOf(0, 2, 1); else -> shown.indices.toList() }
-                order.forEach { i ->
-                    val side = when {
-                        shown.size == 1 -> 0
-                        shown.size == 2 -> if (i == 0) -1 else 1
-                        else -> i - 1
+                val w = maxWidth
+                Box(Modifier.fillMaxWidth().height(w * 0.82f), contentAlignment = Alignment.Center) {
+                    val shown = books.take(3)
+                    val order = when (shown.size) { 3 -> listOf(0, 2, 1); else -> shown.indices.toList() }
+                    order.forEach { i ->
+                        val side = when {
+                            shown.size == 1 -> 0
+                            shown.size == 2 -> if (i == 0) -1 else 1
+                            else -> i - 1
+                        }
+                        BookCover(
+                            shown[i],
+                            Modifier
+                                .width(if (side == 0) w * 0.44f else w * 0.40f)
+                                .aspectRatio(2f / 3f)
+                                .graphicsLayer {
+                                    translationX = side * (w * 0.30f).toPx()
+                                    rotationZ = side * 5f
+                                    translationY = if (side == 0) 0f else (w * 0.03f).toPx()
+                                },
+                        )
                     }
-                    BookCover(
-                        shown[i],
-                        Modifier
-                            .padding(top = 18.dp)
-                            .width(if (side == 0) 74.dp else 66.dp)
-                            .aspectRatio(2f / 3f)
-                            .graphicsLayer {
-                                translationX = side * 34.dp.toPx()
-                                rotationZ = side * 6f
-                                translationY = if (side == 0) 0f else 6.dp.toPx()
-                            },
-                    )
                 }
             }
-            Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = MaterialTheme.typography.bodyLarge.fontFamily), fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 onEdit?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Edit, androidx.compose.ui.res.stringResource(com.chmouel.liseur.R.string.liburu_wf_edit)) } }

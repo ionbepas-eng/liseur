@@ -151,14 +151,13 @@ internal fun LiburuControls(
                 modifier = Modifier.weight(1f),
             )
             extra?.invoke()
-            filterMenu()
             onChooseStyle?.let { choose ->
                 androidx.compose.material3.IconButton(onClick = choose) {
                     Icon(Icons.Outlined.Dashboard, stringResource(R.string.library_style), Modifier.size(20.dp))
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinePill(stringResource(R.string.liburu_lib_refresh), Icons.Outlined.Refresh, actions.onRefresh)
             var addOpen by remember { mutableStateOf(false) }
             Box {
@@ -180,13 +179,13 @@ private fun Pill(text: String, on: Boolean, ink: Color, paper: Color, onClick: (
         onClick = onClick,
         shape = CircleShape,
         color = if (on) ink else Color.Transparent,
-        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = if (on) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Text(
             text,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = if (on) paper else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
         )
     }
 }
@@ -197,12 +196,12 @@ private fun OutlinePill(text: String, icon: androidx.compose.ui.graphics.vector.
         onClick = onClick,
         shape = CircleShape,
         color = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Row(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }

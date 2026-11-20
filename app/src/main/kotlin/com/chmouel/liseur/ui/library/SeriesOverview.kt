@@ -353,7 +353,7 @@ private fun LiburuSeriesGrid(
     val singles = series.count { it.volumes.size == 1 }
     val shown = if (hideSingles) series.filter { it.volumes.size > 1 } else series
     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-        columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(170.dp),
+        columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(150.dp),
         modifier = modifier,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = bottomInset + 24.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -386,7 +386,6 @@ private fun LiburuSeriesGrid(
                 title = shelf.name,
                 subtitle = if (read > 0) stringResource(R.string.liburu_se_read, count, read) else count,
                 onClick = { onSeriesSelected(shelf) },
-                onEdit = { editing = shelf },
             )
         }
     }

@@ -77,35 +77,38 @@ internal fun LibrarySections(
     }
     val ink = MaterialTheme.colorScheme.onSurface
     val paper = if (ink.luminance() > 0.5f) Color(0xFF111111) else Color.White
-    // Centred on the screen whatever its width, as Ion asked.
-    androidx.compose.foundation.layout.Box(modifier.fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-    androidx.compose.material3.Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        androidx.compose.foundation.layout.Row(
-            Modifier.padding(6.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
+    // All five fit on any phone, each slot as wide as its word needs, as on the web.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
+        val narrow = maxWidth < 420.dp
+        val names = labels.map { (id, label) -> id to stringResource(label) }
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            labels.forEach { (id, label) ->
-                val on = id == selected
-                androidx.compose.material3.Surface(
-                    onClick = { onSelect(id) },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
-                    color = if (on) ink else Color.Transparent,
-                ) {
-                    Text(
-                        stringResource(label),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
-                        color = if (on) paper else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                    )
+            androidx.compose.foundation.layout.Row(Modifier.padding(5.dp)) {
+                names.forEach { (id, name) ->
+                    val on = id == selected
+                    androidx.compose.material3.Surface(
+                        onClick = { onSelect(id) },
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+                        color = if (on) ink else Color.Transparent,
+                        modifier = Modifier.weight(name.length + 4f),
+                    ) {
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontSize = if (narrow) 13.sp else 16.sp, letterSpacing = 0.sp),
+                            fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                            color = if (on) paper else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1, softWrap = false,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(vertical = if (narrow) 11.dp else 13.dp),
+                        )
+                    }
                 }
             }
         }
     }
-}
 }
 
 private enum class NotesFilter { ALL, HIGHLIGHTS, NOTES }

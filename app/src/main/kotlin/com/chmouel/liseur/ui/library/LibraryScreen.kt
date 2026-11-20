@@ -704,7 +704,6 @@ fun LibraryScreen(
                                         text = when {
                                             !layout.tabs || onboarding -> stringResource(R.string.library_title)
                                             showHome -> stringResource(R.string.library_style_home)
-                                            showSeries -> stringResource(R.string.home_tile_series)
                                             else -> stringResource(R.string.library_tab_library)
                                         },
                                         style = MaterialTheme.typography.displaySmall,

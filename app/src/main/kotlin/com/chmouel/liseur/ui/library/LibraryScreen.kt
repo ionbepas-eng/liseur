@@ -980,7 +980,7 @@ fun LibraryScreen(
                         },
                         seriesAvailable = state.series.isNotEmpty(),
                         comicsAvailable = comicIds.isNotEmpty(),
-                        audioAvailable = audioBooks.isNotEmpty(),
+                        audioAvailable = true,
                         onSelect = { section ->
                             audioShown = section == 5
                             notesShown = section == 2

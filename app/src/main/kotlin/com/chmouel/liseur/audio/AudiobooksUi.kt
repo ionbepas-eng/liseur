@@ -120,19 +120,31 @@ fun AudiobooksOverview(bottomInset: Dp, modifier: Modifier = Modifier) {
     var scanning by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<LiburuAudiobooks.Audiobook?>(null) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { scanning = true; runCatching { LiburuAudiobooks.scan(context) }; scanning = false }
+    val error by LiburuAudiobooks.lastError.collectAsState()
+    var attempt by remember { mutableStateOf(0) }
+    LaunchedEffect(attempt) {
+        scanning = true
+        runCatching { LiburuAudiobooks.scan(context) }.onFailure { LiburuAudiobooks.lastError.value = it.message ?: it.javaClass.simpleName }
+        scanning = false
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(116.dp), modifier = modifier,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = bottomInset + 24.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) { Column {
             Text(
                 if (books.isEmpty()) (if (scanning) "Buscando la carpeta «Audiolibros» en tu Drive…" else "No hay audiolibros. Crea en Drive una carpeta «Audiolibros» con una subcarpeta por libro (sus pistas en orden y, si quieres, la portada).")
                 else "${books.size} ${if (books.size == 1) "audiolibro" else "audiolibros"} · se escuchan desde Drive" + if (scanning) " · actualizando…" else "",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
+            error?.takeIf { !scanning }?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Text("No he podido leer tu Drive: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { attempt++ }) { Text("Reintentar") }
+                }
+            }
+        } }
         items(books, key = { it.id }) { b ->
             val f = LiburuAudiobooks.fraction(context, b.id)
             Column(Modifier.clickable { open = b; scope.launch { runCatching { AudioController.open(context, b) } } }) {

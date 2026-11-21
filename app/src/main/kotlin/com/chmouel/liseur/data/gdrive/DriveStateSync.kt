@@ -100,6 +100,8 @@ class DriveStateSync(
         upload(files.firstOrNull { it.second == myName }?.first, mine.toString())
         runCatching { syncSharedProfile() }.onFailure { Log.w(TAG, "shared profile failed", it) }
         runCatching { exchangeSessions() }.onFailure { Log.w(TAG, "sessions exchange failed", it) }
+        // Liburuville: the «Audiolibros» folder, looked at with a session that is known to work.
+        runCatching { com.chmouel.liseur.audio.LiburuAudiobooks.scan(app) }.onFailure { Log.w(TAG, "audiobooks scan failed", it) }
         // What each EPUB says of itself (series, cover, synopsis), then the
         // catalog again so the shelf shows it; then covers from the internet.
         runCatching { if (LiburuPeek.fill(bookDao) > 0) refreshCatalog() }.onFailure { Log.w(TAG, "peek failed", it) }

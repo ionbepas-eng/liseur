@@ -26,6 +26,7 @@ object LiburuAudiobooks {
 
     private const val FILE = "liburu-audiobooks.json"
     val list = MutableStateFlow<List<Audiobook>>(emptyList())
+    val lastError = MutableStateFlow<String?>(null)
     private val AUDIO = Regex("\\.(mp3|m4a|m4b|aac|ogg|opus|flac|wav)$", RegexOption.IGNORE_CASE)
     private val IMG = Regex("\\.(jpe?g|png|webp)$", RegexOption.IGNORE_CASE)
     private const val FOLDER = "application/vnd.google-apps.folder"
@@ -78,8 +79,10 @@ object LiburuAudiobooks {
     suspend fun scan(context: Context): Int = withContext(Dispatchers.IO) {
         val q = "name='Audiolibros' and mimeType='$FOLDER' and trashed=false"
         val url = "${DriveAuth.BASE_URL}/files".toHttpUrl().newBuilder().addQueryParameter("q", q).addQueryParameter("fields", "files(id,name)").build()
-        val roots = http.newCall(Request.Builder().url(url).build()).execute().use { r -> if (!r.isSuccessful) return@withContext list.value.size; JSONObject(r.body.string()).optJSONArray("files") }
-            ?: return@withContext list.value.size
+        val roots = http.newCall(Request.Builder().url(url).build()).execute().use { r ->
+            if (!r.isSuccessful) throw java.io.IOException("Drive respondió ${r.code}" + if (r.code == 401) " (reconecta Google Drive)" else "")
+            JSONObject(r.body.string()).optJSONArray("files")
+        } ?: return@withContext list.value.size
         val coll = Collator.getInstance(Locale("es")).apply { strength = Collator.PRIMARY }
         val numeric = Comparator<Track> { a, b ->
             val ka = a.name.replace(Regex("\\d+")) { it.value.padStart(8, '0') }; val kb = b.name.replace(Regex("\\d+")) { it.value.padStart(8, '0') }
@@ -130,6 +133,7 @@ object LiburuAudiobooks {
             b.copy(cover = cover)
         }.sortedBy { it.title.lowercase() }
         save(context, withCovers)
+        lastError.value = null
         withCovers.size
     }
 

@@ -41,7 +41,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -81,6 +80,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material3.DropdownMenu
@@ -543,7 +543,6 @@ fun LibraryScreen(
     var notesShown by rememberSaveable { mutableStateOf(false) }
     var shelvesShown by rememberSaveable { mutableStateOf(false) }
     var comicsShown by rememberSaveable { mutableStateOf(false) }
-    var audioShown by rememberSaveable { mutableStateOf(false) }
     val comicIds by LiburuComics.ids.collectAsState()
     val activeStyle = if (showHome) LibraryStyle.HOME else catalogueStyle
     val scrollStyleToTop: (LibraryStyle) -> Unit = { target ->
@@ -972,7 +971,6 @@ fun LibraryScreen(
                 if (sectionsShown) {
                     LibrarySections(
                         selected = when {
-                            audioShown -> 5
                             shelvesShown -> 3
                             notesShown -> 2
                             showSeries -> 1
@@ -981,9 +979,7 @@ fun LibraryScreen(
                         },
                         seriesAvailable = state.series.isNotEmpty(),
                         comicsAvailable = comicIds.isNotEmpty(),
-                        audioAvailable = true,
                         onSelect = { section ->
-                            audioShown = section == 5
                             notesShown = section == 2
                             shelvesShown = section == 3
                             comicsShown = section == 4
@@ -994,11 +990,6 @@ fun LibraryScreen(
                 }
                 when {
                     state.loading -> LibrarySkeleton(fillAboveBar)
-
-                    sectionsShown && audioShown -> com.chmouel.liseur.audio.AudiobooksOverview(
-                        bottomInset = bottomInset,
-                        modifier = Modifier.fillMaxSize(),
-                    )
 
                     sectionsShown && shelvesShown -> ShelvesOverview(
                         books = state.books,
@@ -1220,11 +1211,14 @@ fun LibraryScreen(
                             state.copy(layout = state.layout.copy(style = activeStyle))
                         }
                         // Liburuville: Libros and Cómics split the same shelf.
-                        val shownState = if (comicIds.isEmpty() || !sectionsShown) styled else {
-                            val keep: (Book) -> Boolean = { b -> (b.url in comicIds) == comicsShown }
+                        val audioOnly = LiburuAudioFilter.on && !comicsShown
+                        val shownState = if ((comicIds.isEmpty() && !audioOnly) || !sectionsShown) styled else {
+                            val keep: (Book) -> Boolean = { b ->
+                                (b.url in comicIds) == comicsShown && (!audioOnly || com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(b.url))
+                            }
                             styled.copy(
                                 quickCounts = styled.quickCounts.copy(
-                                    all = if (comicsShown) comicIds.size else (styled.quickCounts.all - comicIds.size).coerceAtLeast(0),
+                                    all = if (audioOnly) audioBooks.size else if (comicsShown) comicIds.size else (styled.quickCounts.all - comicIds.size).coerceAtLeast(0),
                                 ),
                                 books = styled.books.filter(keep),
                                 shelfEntries = styled.shelfEntries.filter { e ->
@@ -2572,8 +2566,12 @@ internal fun BookCard(
                 androidx.compose.material3.Surface(
                     shape = androidx.compose.foundation.shape.CircleShape,
                     color = androidx.compose.ui.graphics.Color(0xCC1F1A14),
-                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(24.dp),
-                ) { Text("🎧", fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.CenterVertically)) }
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Headphones, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(15.dp))
+                    }
+                }
             }
             // Only a search shows an archived book among others, and
             // the corner left free by the rest says so.

@@ -135,6 +135,7 @@ internal fun LiburuControls(
                         onSetReadingFilter(if (options == ALL_READING_STATES) options else if (on) ALL_READING_STATES else options)
                     }
                 }
+                Pill("🎧 Audiolibros", LiburuAudioFilter.on, ink, paper) { LiburuAudioFilter.on = !LiburuAudioFilter.on }
                 val grouped = state.filters.groupBySeries
                 Pill((if (grouped) "✓ " else "") + stringResource(R.string.liburu_lib_group_series), grouped, ink, paper) {
                     onSetGroupBySeries(!grouped)
@@ -201,4 +202,10 @@ private fun OutlinePill(text: String, icon: androidx.compose.ui.graphics.vector.
             Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
+}
+
+
+/** Liburuville: the web's «🎧 Audiolibros» pill — the shelf narrowed to the books you listen to. */
+internal object LiburuAudioFilter {
+    var on by androidx.compose.runtime.mutableStateOf(false)
 }

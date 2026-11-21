@@ -505,6 +505,7 @@ class BookDownloadRepository(
      * it again.
      */
     suspend fun removeDownload(book: Book) {
+        com.chmouel.liseur.audio.LiburuAudiobooks.removeLocal(context, book.url)
         val key = fileKey(book) ?: return
         fileFor(key).delete()
         File(booksDir(), "$key.epub.part").delete()

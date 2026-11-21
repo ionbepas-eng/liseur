@@ -19,7 +19,7 @@ object LiburuShelves {
     private const val PENDING = "liburu-shelves-pending.json"
     val version = MutableStateFlow(0)
 
-    fun keyOf(url: String) = if (url.startsWith("gdrive:")) "g:" + url.removePrefix("gdrive:") else url
+    fun keyOf(url: String) = if (url.startsWith("gdrive:")) (if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(url)) "a:" else "g:") + url.removePrefix("gdrive:") else url
 
     private fun state(context: Context): JSONObject =
         runCatching { JSONObject(File(context.filesDir, DriveStateSync.STATE_CACHE).readText()) }.getOrNull() ?: JSONObject()

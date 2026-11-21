@@ -31,7 +31,43 @@ object LiburuAudiobooks {
     private val IMG = Regex("\\.(jpe?g|png|webp)$", RegexOption.IGNORE_CASE)
     private const val FOLDER = "application/vnd.google-apps.folder"
 
+    @Volatile var app: Context? = null
+
+    /** The Drive id of an audiobook (its folder, or its single file), when this url is one. */
+    fun driveIdOf(url: String): String? = url.takeIf { it.startsWith("gdrive:") }?.removePrefix("gdrive:")?.takeIf { id -> list.value.any { it.id == "a:$id" } }
+    fun isAudio(url: String) = driveIdOf(url) != null
+    fun byUrl(url: String) = driveIdOf(url)?.let { id -> list.value.firstOrNull { it.id == "a:$id" } }
+
+    /** Where a downloaded audiobook's tracks are kept. */
+    fun dir(context: Context, book: Audiobook) = File(context.filesDir, "audio/" + book.id.removePrefix("a:"))
+    fun localTrack(context: Context, book: Audiobook, t: Track): File? = File(dir(context, book), t.id).takeIf { it.exists() && it.length() > 0 }
+
+    /** Downloads every track (resuming what is there), reporting the share done. */
+    fun downloadAll(context: Context, book: Audiobook, onProgress: (Float) -> Unit) {
+        val d = dir(context, book).apply { mkdirs() }
+        val total = book.tracks.sumOf { it.size.coerceAtLeast(1) }
+        var done = 0L
+        for (t in book.tracks) {
+            val f = File(d, t.id)
+            if (f.exists() && t.size > 0 && f.length() == t.size) { done += t.size; onProgress(done.toFloat() / total); continue }
+            val part = File(d, t.id + ".part")
+            http.newCall(Request.Builder().url("${DriveAuth.BASE_URL}/files/${t.id}?alt=media").build()).execute().use { r ->
+                if (!r.isSuccessful) throw java.io.IOException("Drive respondió ${r.code}")
+                r.body.byteStream().use { input -> part.outputStream().use { out ->
+                    val buf = ByteArray(64 * 1024); var n: Int; var since = 0L
+                    while (input.read(buf).also { n = it } != -1) { out.write(buf, 0, n); since += n; if (since > 1_000_000) { done += since; since = 0; onProgress(done.toFloat() / total) } }
+                    done += since
+                } }
+            }
+            part.renameTo(f)
+            onProgress(done.toFloat() / total)
+        }
+    }
+
+    fun removeLocal(context: Context, url: String) { byUrl(url)?.let { dir(context, it).deleteRecursively() } }
+
     fun init(context: Context) {
+        app = context.applicationContext
         if (list.value.isNotEmpty()) return
         list.value = runCatching { parse(JSONArray(File(context.filesDir, FILE).readText())) }.getOrDefault(emptyList())
     }

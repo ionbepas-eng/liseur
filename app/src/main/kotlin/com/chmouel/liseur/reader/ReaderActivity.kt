@@ -1101,7 +1101,9 @@ class ReaderActivity : FragmentActivity() {
             at: String? = null,
             resumeListening: Boolean = false,
             resumeListeningToken: String? = null,
-        ): Intent =
+        ): Intent = if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(id)) {
+            Intent(context, com.chmouel.liseur.audio.AudioPlayerActivity::class.java).putExtra("url", id)
+        } else
             Intent(context, ReaderActivity::class.java)
                 .putExtra(EXTRA_URL, url)
                 .putExtra(EXTRA_ID, id)

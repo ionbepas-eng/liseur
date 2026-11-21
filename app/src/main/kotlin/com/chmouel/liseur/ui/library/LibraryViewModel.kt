@@ -1501,6 +1501,11 @@ class LibraryViewModel(
         book: Book,
         resumeListening: Boolean = false,
     ) {
+        // Liburuville: an audiobook plays straight from Drive; downloading it is a choice, not a step.
+        com.chmouel.liseur.audio.LiburuAudiobooks.app?.takeIf { com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(book.url) }?.let { ctx ->
+            ctx.startActivity(android.content.Intent(ctx, com.chmouel.liseur.audio.AudioPlayerActivity::class.java).putExtra("url", book.url).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        }
         awaitingOpen.value = PendingOpen(book.url, resumeListening)
         viewModelScope.launch { downloads.enqueue(book) }
     }

@@ -94,7 +94,7 @@ private val Paper = Color(0xFFFFFBF8)
 /** One reading session, Android's or the web's, the way the web counts them. */
 private data class Sit(val key: String, val start: Long, val seconds: Double, val from: Double?, val to: Double?, val pages: Double?, val device: String = "android-here")
 
-private fun keyOf(url: String) = if (url.startsWith("gdrive:")) "g:" + url.removePrefix("gdrive:") else url
+private fun keyOf(url: String) = if (url.startsWith("gdrive:")) (if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(url)) "a:" else "g:") + url.removePrefix("gdrive:") else url
 
 /** Everything the web's Estadísticas shows, worked out from the same data. */
 private class StatsData(context: Context, val books: List<Book>, android: List<ReadingSession>) {

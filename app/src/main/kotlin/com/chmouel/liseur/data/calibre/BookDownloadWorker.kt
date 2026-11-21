@@ -86,6 +86,21 @@ class BookDownloadWorker(
         bookDao.setDownloadState(bookUrl, DownloadState.DOWNLOADING, null)
         setProgress(progressData(bookUrl, null))
 
+        // Liburuville: an audiobook is its folder of tracks.
+        com.chmouel.liseur.audio.LiburuAudiobooks.byUrl(bookUrl)?.let { ab ->
+            val ok = runCatching {
+                com.chmouel.liseur.audio.LiburuAudiobooks.downloadAll(applicationContext, ab) { f -> kotlinx.coroutines.runBlocking { setProgress(progressData(bookUrl, f)) } }
+            }
+            return if (ok.isSuccess) {
+                container.bookDownloads.fileFor(fileKey).writeText("liburu-audio:" + ab.id)
+                container.bookDownloads.markDownloaded(bookUrl, fileKey)
+                Result.success()
+            } else {
+                applicationContext.getSharedPreferences("liburu", 0).edit().putString("dlErr:$bookUrl", ok.exceptionOrNull()?.message).apply()
+                if (runAttemptCount >= 2) fail(bookUrl) else { bookDao.setDownloadState(bookUrl, DownloadState.QUEUED, null); Result.retry() }
+            }
+        }
+
         val downloads = container.bookDownloads
         val downloader = BookDownloader(
             http = files.downloadHttp(),

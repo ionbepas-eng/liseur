@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -2567,6 +2568,13 @@ internal fun BookCard(
                 FinishedBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
             }
             if (selecting) LiburuSelectionMark(book.url in chosen, Modifier.align(Alignment.TopEnd).padding(6.dp))
+            if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(book.url)) {
+                androidx.compose.material3.Surface(
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    color = androidx.compose.ui.graphics.Color(0xCC1F1A14),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(24.dp),
+                ) { Text("🎧", fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxSize().wrapContentHeight(Alignment.CenterVertically)) }
+            }
             // Only a search shows an archived book among others, and
             // the corner left free by the rest says so.
             if (book.archived && progress == null) {

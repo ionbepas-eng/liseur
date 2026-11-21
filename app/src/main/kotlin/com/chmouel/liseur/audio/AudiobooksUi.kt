@@ -1,5 +1,6 @@
 package com.chmouel.liseur.audio
 
+import androidx.activity.compose.setContent
 import android.content.ComponentName
 import android.content.Context
 import androidx.activity.compose.BackHandler
@@ -84,7 +85,7 @@ object AudioController {
         val playingThis = c.mediaItemCount == book.tracks.size && c.mediaItemCount > 0 && c.getMediaItemAt(0).mediaId == book.tracks[0].id
         if (!playingThis) {
             val items = book.tracks.mapIndexed { i, t ->
-                MediaItem.Builder().setMediaId(t.id).setUri("${DriveAuth.BASE_URL}/files/${t.id}?alt=media")
+                MediaItem.Builder().setMediaId(t.id).setUri(LiburuAudiobooks.localTrack(context, book, t)?.let { android.net.Uri.fromFile(it).toString() } ?: "${DriveAuth.BASE_URL}/files/${t.id}?alt=media")
                     .setMediaMetadata(MediaMetadata.Builder().setTitle(book.title).setArtist(book.author).setAlbumTitle(t.name.substringAfterLast('/').substringBeforeLast('.'))
                         .setTrackNumber(i + 1).setTotalTrackCount(book.tracks.size).apply { book.cover?.let { setArtworkUri(android.net.Uri.parse(it)) } }.build())
                     .build()
@@ -266,5 +267,23 @@ private fun RoundBtn(label: String, size: Dp, filled: Boolean = false, onClick: 
 private fun Pill(label: String, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = CircleShape, color = Color.White.copy(alpha = 0.12f)) {
         Text(label, color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp))
+    }
+}
+
+
+/** The player as its own screen, so a tap on an audiobook anywhere (shelf, series, Home) opens it. */
+class AudioPlayerActivity : androidx.activity.ComponentActivity() {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        val url = intent.getStringExtra("url").orEmpty()
+        LiburuAudiobooks.init(this)
+        val book = LiburuAudiobooks.byUrl(url) ?: run { finish(); return }
+        setContent {
+            com.chmouel.liseur.ui.theme.LiseurTheme {
+                val ctx = LocalContext.current
+                LaunchedEffect(book.id) { runCatching { AudioController.open(ctx, book) } }
+                AudiobookPlayer(book) { finish() }
+            }
+        }
     }
 }

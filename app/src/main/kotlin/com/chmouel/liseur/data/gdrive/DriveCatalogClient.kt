@@ -51,6 +51,12 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
                     val name = f.optString("name")
                     if (f.optString("mimeType") == FOLDER) {
                         if (!name.equals("Audiolibros", ignoreCase = true)) queue += f.getString("id")
+                        else {
+                            // Liburuville: each audiobook is a book of the library, as on the web.
+                            val ctx = com.chmouel.liseur.audio.LiburuAudiobooks.app
+                            if (ctx != null) runCatching { com.chmouel.liseur.audio.LiburuAudiobooks.scan(ctx) }
+                            com.chmouel.liseur.audio.LiburuAudiobooks.list.value.forEach { ab -> books += audioBook(ab) }
+                        }
                         continue
                     }
                     if (!name.lowercase().let { it.endsWith(".epub") || it.endsWith(".cbz") }) continue
@@ -96,6 +102,18 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
             if (!response.isSuccessful) throw IOException("Drive ${response.code}")
             return JSONObject(text)
         }
+    }
+
+    private fun audioBook(ab: com.chmouel.liseur.audio.LiburuAudiobooks.Audiobook): RemoteBook {
+        val id = ab.id.removePrefix("a:")
+        return RemoteBook(
+            remoteId = id,
+            title = ab.title,
+            author = ab.author.ifBlank { null },
+            coverHref = ab.cover,
+            downloadHref = "${DriveAuth.BASE_URL}/files/${ab.tracks.first().id}?alt=media",
+            sizeBytes = ab.tracks.sumOf { it.size },
+        )
     }
 
     private fun book(f: JSONObject): RemoteBook {

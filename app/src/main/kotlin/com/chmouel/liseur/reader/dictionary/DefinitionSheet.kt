@@ -151,6 +151,10 @@ fun DefinitionSheet(
     selectedDefinitionActions: (@Composable (String, String?) -> Unit)? = null,
     client: WiktionaryClient = remember { WiktionaryClient() },
 ) {
+    // Liburuville: a word from a Spanish book is defined in Spanish (es.wiktionary, like the RAE
+    // would), not glossed in English. The same for the other big editions; a chosen site stays.
+    @Suppress("NAME_SHADOWING")
+    val baseUrl = liburuSiteFor(baseUrl, bookLanguage, languages)
     val context = LocalContext.current
     val offlineState by OfflineDictionary.state(context).collectAsState()
     val offline = remember(offlineState.packs, languages, bookLanguage) {
@@ -1183,4 +1187,14 @@ private fun DefinitionLinkTarget(
                 .focusable(enabled = keyboardFocusable),
         )
     }
+}
+
+
+private val LIBURU_EDITIONS = setOf("es", "fr", "de", "it", "pt", "ca", "eu", "gl")
+
+internal fun liburuSiteFor(baseUrl: String, bookLanguage: String?, languages: List<String>): String {
+    if (baseUrl.trimEnd('/') != com.chmouel.liseur.domain.DictionaryUrl.DEFAULT_BASE_URL) return baseUrl
+    val lang = (bookLanguage?.takeIf { it.isNotBlank() } ?: languages.firstOrNull())
+        ?.let { Locale.forLanguageTag(it).language }?.lowercase() ?: return baseUrl
+    return if (lang in LIBURU_EDITIONS) "https://$lang.wiktionary.org" else baseUrl
 }

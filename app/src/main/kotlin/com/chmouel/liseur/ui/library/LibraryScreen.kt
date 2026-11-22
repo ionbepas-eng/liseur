@@ -598,150 +598,8 @@ fun LibraryScreen(
         scrollStyleToTop(catalogueStyle)
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHost) },
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        // The bar floats over the content; this keeps the room it covers
-        // in the insets, so lists scroll out from under it.
-        bottomBar = {
-            if (showBottomBar) Spacer(Modifier.height(mainTabBarSpace()))
-        },
-        topBar = {
-            if (state.isSearchActive) {
-                TopAppBar(
-                    title = {
-                        OutlinedTextField(
-                            value = searchField,
-                            onValueChange = {
-                                searchField = it
-                                onSearchQueryChange(it.text)
-                            },
-                            placeholder = { Text(stringResource(R.string.search_books)) },
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(searchFocus),
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { onSetSearchActive(false) }) {
-                            Icon(
-                                Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                    actions = {
-                        if (searchField.text.isNotEmpty()) {
-                            IconButton(onClick = {
-                                searchField = TextFieldValue()
-                                onSearchQueryChange("")
-                            }) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = stringResource(R.string.clear),
-                                )
-                            }
-                        }
-                    },
-                )
-            } else {
-                // Deliberately the compact bar, not the large one: the
-                // collapsed form is the good one, so it is what the shelf
-                // gets all the time rather than only once you scroll.
-                TopAppBar(
-                    title = {
-                        // The archive is a place of its own, so the bar
-                        // says where you are instead of whose shelf it
-                        // is: the brand tile and the book count both
-                        // belong to the library you have stepped out of.
-                        if (archived) {
-                            Text(
-                                text = stringResource(R.string.filter_archived),
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                        } else if (showHome) {
-                            // Liburuville: Home's own greeting is its header.
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { scrollCurrentToTop() },
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                // A woman reading stretched out on her couch,
-                                // cut from the banner art — the reading mark,
-                                // in place of a plain wordmark or the launcher
-                                // icon.  Painted art with its own wall and
-                                // floor, so it is framed as a small tile
-                                // rather than knocked out to line work.
-                                //
-                                // Which cut to draw is asked of the theme in
-                                // force here, not of a -night qualifier: those
-                                // follow the system, and the app's own
-                                // light/dark setting is allowed to disagree.
-                                // Liburuville: no brand tile; the title stands alone, as on the web.
-                                if (false) Image(
-                                    painter = painterResource(
-                                        if (darkMark) R.drawable.ic_reading_scene_night
-                                        else R.drawable.ic_reading_scene,
-                                    ),
-                                    contentDescription = null,
-                                    // Fit, not Crop, and the frame pinned to
-                                    // the picture's own aspect: whatever
-                                    // height the bar ends up granting, the
-                                    // box can never come out wider than the
-                                    // art and take a slice off her head.
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .height(tileHeight)
-                                        .aspectRatio(BRAND_TILE_ASPECT)
-                                        .clip(RoundedCornerShape(if (wide) 14.dp else 10.dp)),
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    // With the tabs, the bar names the tab, so
-                                    // Home and Library never look like one screen.
-                                    Text(
-                                        text = when {
-                                            !layout.tabs || onboarding -> stringResource(R.string.library_title)
-                                            showHome -> stringResource(R.string.library_style_home)
-                                            else -> stringResource(R.string.library_tab_library)
-                                        },
-                                        style = MaterialTheme.typography.displaySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    if (showHome && !onboarding) {
-                                        pulse?.let { PulseLine(it, onOpenStats) }
-                                    } else if (false && !showSeries && !state.loading && state.books.isNotEmpty()) {
-                                        Text(
-                                            text = shelfCountLine(state),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            letterSpacing = 0.8.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        if (archived) {
-                            IconButton(
-                                onClick = { onToggleFilter(LibraryFilterOption.ARCHIVED) },
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.ArrowBack,
-                                    contentDescription = stringResource(R.string.back),
-                                )
-                            }
-                        }
-                    },
-                    // The tall bar exists to hold the brand tile; without
-                    // it, a title alone in that much space is just a gap.
-                    expandedHeight = if (archived) 64.dp else libraryBarHeight(barWidth),
-                    actions = {
+    // Liburuville: the bar's actions, also drawn inside Home's greeting so Home needs no bar.
+    val barActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
                         // Liburuville: on the library itself, search and Add live in
                         // the page (as on the web) and the bar keeps a round refresh.
                         val webLike = !showHome && !archived
@@ -905,7 +763,153 @@ fun LibraryScreen(
                                 )
                             }
                         }
+                    }
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHost) },
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        // The bar floats over the content; this keeps the room it covers
+        // in the insets, so lists scroll out from under it.
+        bottomBar = {
+            if (showBottomBar) Spacer(Modifier.height(mainTabBarSpace()))
+        },
+        topBar = {
+            if (showHome && !state.isSearchActive && !archived) {
+                // Home's greeting carries the actions; a bar would only be an empty white strip.
+            } else if (state.isSearchActive) {
+                TopAppBar(
+                    title = {
+                        OutlinedTextField(
+                            value = searchField,
+                            onValueChange = {
+                                searchField = it
+                                onSearchQueryChange(it.text)
+                            },
+                            placeholder = { Text(stringResource(R.string.search_books)) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocus),
+                        )
                     },
+                    navigationIcon = {
+                        IconButton(onClick = { onSetSearchActive(false) }) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                    actions = {
+                        if (searchField.text.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchField = TextFieldValue()
+                                onSearchQueryChange("")
+                            }) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = stringResource(R.string.clear),
+                                )
+                            }
+                        }
+                    },
+                )
+            } else {
+                // Deliberately the compact bar, not the large one: the
+                // collapsed form is the good one, so it is what the shelf
+                // gets all the time rather than only once you scroll.
+                TopAppBar(
+                    title = {
+                        // The archive is a place of its own, so the bar
+                        // says where you are instead of whose shelf it
+                        // is: the brand tile and the book count both
+                        // belong to the library you have stepped out of.
+                        if (archived) {
+                            Text(
+                                text = stringResource(R.string.filter_archived),
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                        } else if (showHome) {
+                            // Liburuville: Home's own greeting is its header.
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { scrollCurrentToTop() },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // A woman reading stretched out on her couch,
+                                // cut from the banner art — the reading mark,
+                                // in place of a plain wordmark or the launcher
+                                // icon.  Painted art with its own wall and
+                                // floor, so it is framed as a small tile
+                                // rather than knocked out to line work.
+                                //
+                                // Which cut to draw is asked of the theme in
+                                // force here, not of a -night qualifier: those
+                                // follow the system, and the app's own
+                                // light/dark setting is allowed to disagree.
+                                // Liburuville: no brand tile; the title stands alone, as on the web.
+                                if (false) Image(
+                                    painter = painterResource(
+                                        if (darkMark) R.drawable.ic_reading_scene_night
+                                        else R.drawable.ic_reading_scene,
+                                    ),
+                                    contentDescription = null,
+                                    // Fit, not Crop, and the frame pinned to
+                                    // the picture's own aspect: whatever
+                                    // height the bar ends up granting, the
+                                    // box can never come out wider than the
+                                    // art and take a slice off her head.
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .height(tileHeight)
+                                        .aspectRatio(BRAND_TILE_ASPECT)
+                                        .clip(RoundedCornerShape(if (wide) 14.dp else 10.dp)),
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    // With the tabs, the bar names the tab, so
+                                    // Home and Library never look like one screen.
+                                    Text(
+                                        text = when {
+                                            !layout.tabs || onboarding -> stringResource(R.string.library_title)
+                                            showHome -> stringResource(R.string.library_style_home)
+                                            else -> stringResource(R.string.library_tab_library)
+                                        },
+                                        style = MaterialTheme.typography.displaySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    if (showHome && !onboarding) {
+                                        pulse?.let { PulseLine(it, onOpenStats) }
+                                    } else if (false && !showSeries && !state.loading && state.books.isNotEmpty()) {
+                                        Text(
+                                            text = shelfCountLine(state),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            letterSpacing = 0.8.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        if (archived) {
+                            IconButton(
+                                onClick = { onToggleFilter(LibraryFilterOption.ARCHIVED) },
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        }
+                    },
+                    // The tall bar exists to hold the brand tile; without
+                    // it, a title alone in that much space is just a gap.
+                    expandedHeight = if (archived) 64.dp else libraryBarHeight(barWidth),
+                    actions = barActions,
                     scrollBehavior = scrollBehavior,
                 )
             }
@@ -1080,6 +1084,7 @@ fun LibraryScreen(
                             showCatalogue(false)
                         },
                         bottomInset = bottomInset,
+                        actions = barActions,
                         modifier = Modifier.fillMaxSize(),
                     )
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -157,6 +158,7 @@ internal fun LiburuHome(
     onBookLongPress: (Book) -> Unit,
     onBrowseAll: () -> Unit,
     bottomInset: Dp,
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -217,6 +219,8 @@ internal fun LiburuHome(
                 GoalRing(rhythm.minutesToday, goal, Modifier.size(64.dp))
                 Spacer(Modifier.width(12.dp))
                 Avatar(Modifier.size(64.dp))
+                Spacer(Modifier.width(4.dp))
+                actions()
             }
         }
         if (quote != null) {
@@ -391,7 +395,9 @@ private fun GoalsCard(
     val accent = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(28.dp), modifier = modifier) {
-        Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Liburuville: on a tablet the card keeps a reading-sized column instead of a gauge the width of the screen.
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 460.dp).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 stringResource(R.string.liburu_goals),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
@@ -425,7 +431,7 @@ private fun GoalsCard(
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = { onContinue(current) },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F1B17), contentColor = Color(0xFFF5F1E6)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 6.dp)) {
@@ -465,6 +471,7 @@ private fun GoalsCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
         }
     }
 }

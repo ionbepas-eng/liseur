@@ -266,13 +266,14 @@ fun DefinitionSheet(
 
     // Liburuville: a floating, translucent card over the page — a context menu for the word,
     // not a sheet that hides half the book.
-    val floatingPaper = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
+    val floatingPaper = MaterialTheme.colorScheme.surface
     LiseurModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = floatingPaper,
         scrimColor = Color.Black.copy(alpha = 0.08f),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        sheetMaxWidth = 460.dp,
         modifier = Modifier
             .padding(horizontal = 14.dp)
             .padding(bottom = 14.dp)

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -574,6 +575,7 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
     val elapsed = if (ym == now) LocalDate.now(zone).dayOfMonth else ym.lengthOfMonth()
     val byDay = ms.groupBy { dayOf(it.start, zone).dayOfMonth }
     var dayOpen by remember { mutableStateOf<Int?>(null) }
+    var adding by remember { mutableStateOf<LocalDate?>(null) }
     Card {
         // The month's watercolour; its name sits on the dark band below the painting.
         Box(Modifier.fillMaxWidth().aspectRatio(2576f / 1438f).androidxClip().background(Color(0xFF1C1A18))) {
@@ -635,10 +637,15 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
                 }
             }
         }
-    }
-    var adding by remember { mutableStateOf<LocalDate?>(null) }
-    androidx.compose.material3.OutlinedButton(onClick = { adding = LocalDate.now(zone) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
-        Text("＋ Agregar sesión", fontWeight = FontWeight.SemiBold)
+        // Inside the card: as a sibling it shared the list item's box and sat on the painting.
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.OutlinedButton(
+            onClick = { adding = LocalDate.now(zone) },
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = 0.6f), contentColor = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth().height(44.dp),
+        ) {
+            Text("＋ Agregar sesión", style = MaterialTheme.typography.labelLarge)
+        } }
     }
     adding?.let { d -> AddSessionDialog(data.books, d, zone) { adding = null } }
     dayOpen?.let { day ->

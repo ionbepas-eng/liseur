@@ -82,7 +82,8 @@ object LiburuAppearance {
         while (bounds.outWidth / (sample * 2) >= 1600) sample *= 2
         val bmp = cr.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) }
             ?: return false
-        imageFile(context).outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+        val upright = LiburuPhotos.upright(context, uri, bmp)
+        imageFile(context).outputStream().use { upright.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
         imageVersion.value++
         setWallpaper(IMAGE)
         true

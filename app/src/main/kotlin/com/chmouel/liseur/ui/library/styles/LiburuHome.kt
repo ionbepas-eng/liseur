@@ -88,7 +88,8 @@ object LiburuPrefs {
 
     /** Square-crops and shrinks a picked photo to 320 px, as the web app does. */
     fun setAvatar(context: Context, source: android.net.Uri) {
-        val bitmap = context.contentResolver.openInputStream(source)?.use(android.graphics.BitmapFactory::decodeStream) ?: return
+        val bitmap = context.contentResolver.openInputStream(source)?.use(android.graphics.BitmapFactory::decodeStream)
+            ?.let { com.chmouel.liseur.ui.theme.LiburuPhotos.upright(context, source, it) } ?: return
         val side = minOf(bitmap.width, bitmap.height)
         val square = android.graphics.Bitmap.createBitmap(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side)
         val small = android.graphics.Bitmap.createScaledBitmap(square, 320, 320, true)

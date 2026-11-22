@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -263,9 +264,19 @@ fun DefinitionSheet(
         }
     }
 
+    // Liburuville: a floating, translucent card over the page — a context menu for the word,
+    // not a sheet that hides half the book.
+    val floatingPaper = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
     LiseurModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = floatingPaper,
+        scrimColor = Color.Black.copy(alpha = 0.08f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        modifier = Modifier
+            .padding(horizontal = 14.dp)
+            .padding(bottom = 14.dp)
+            .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
     ) {
         val entryScroll = key(term, source) { rememberScrollState() }
         var selection by remember(term, source) { mutableStateOf<Pair<Any, String>?>(null) }

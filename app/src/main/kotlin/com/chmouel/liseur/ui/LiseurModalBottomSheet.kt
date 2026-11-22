@@ -89,6 +89,7 @@ fun LiseurModalBottomSheet(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     scrimColor: Color = BottomSheetDefaults.ScrimColor,
     onBack: (() -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val eInk = LocalEInk.current
@@ -100,6 +101,7 @@ fun LiseurModalBottomSheet(
             containerColor = containerColor,
             contentColor = contentColor,
             scrimColor = scrimColor,
+            shape = shape ?: BottomSheetDefaults.ExpandedShape,
             properties = ModalBottomSheetProperties(shouldDismissOnBackPress = onBack == null),
             dragHandle = {
                 BottomSheetDefaults.DragHandle(

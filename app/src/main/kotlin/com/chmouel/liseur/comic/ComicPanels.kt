@@ -11,6 +11,9 @@ import kotlin.math.abs
  * (right to left in manga). A page it cannot cut cleanly is one panel.
  */
 object ComicPanels {
+    /** Whether the page's gutters are dark, so the guided view masks the rest of the page in the same colour. */
+    @Volatile var darkGutters: Boolean = false
+
     fun detect(page: Bitmap, manga: Boolean): List<RectF> {
         val w = 320
         val h = (page.height * w.toFloat() / page.width).toInt().coerceAtLeast(1)
@@ -23,6 +26,7 @@ object ComicPanels {
         for (x in 0 until w) { edge[lum(px[x])]++; edge[lum(px[(h - 1) * w + x])]++ }
         for (y in 0 until h) { edge[lum(px[y * w])]++; edge[lum(px[y * w + w - 1])]++ }
         val bg = edge.indices.maxBy { edge[it] }
+        darkGutters = bg < 100
         val ink = BooleanArray(w * h) { abs(lum(px[it]) - bg) > 38 }
 
         fun runs(count: (Int) -> Int, n: Int, across: Int, minLen: Int): List<IntRange> {

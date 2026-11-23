@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -242,7 +243,16 @@ private fun ComicPager(
                 manga = manga,
                 panel = panel,
                 onPanels = { n -> panelCount = n; if (panel >= n) panel = n - 1 },
-                onTap = { x, width ->
+onToggleGuided = {
+                    panelMode = !panelMode; panel = 0; chrome = false
+                    prefs.edit().putBoolean("panels", panelMode).apply()
+                    if (panelMode && !prefs.getBoolean("guidedHint", false)) {
+                        prefs.edit().putBoolean("guidedHint", true).apply()
+                        android.widget.Toast.makeText(context, "Vista guiada: toca o desliza para avanzar · doble toque para salir", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                },
+                onSwipe = { forward -> step(forward = if (manga) !forward else forward) },
+                                onTap = { x, width ->
                     when {
                         x < width * 0.3f -> step(forward = manga)
                         x > width * 0.7f -> step(forward = !manga)
@@ -303,6 +313,8 @@ private fun ZoomableSpread(
     manga: Boolean = false,
     panel: Int = 0,
     onPanels: (Int) -> Unit = {},
+    onToggleGuided: () -> Unit = {},
+    onSwipe: (Boolean) -> Unit = {},
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -322,18 +334,21 @@ private fun ZoomableSpread(
             .fillMaxSize()
             .pointerInput(panelMode) {
                 detectTapGestures(
-                    onDoubleTap = { at ->
-                        if (scale > 1.01f) { scale = 1f; offset = Offset.Zero; onZoomChange(false) }
-                        else {
-                            scale = 2.5f
-                            offset = Offset((size.width / 2f - at.x) * 1.5f, (size.height / 2f - at.y) * 1.5f)
-                            onZoomChange(true)
-                        }
-                    },
+                    // Kindle's guided view: a double tap goes in and out of it.
+                    onDoubleTap = { if (single) onToggleGuided() else if (scale > 1.01f) { scale = 1f; offset = Offset.Zero; onZoomChange(false) } },
                     onTap = { at -> if (scale <= 1.01f || panelMode) onTap(at.x, size.width.toFloat()) },
                 )
             }
-            .pointerInput(Unit) {
+            .pointerInput(panelMode) {
+                if (!panelMode) return@pointerInput
+                var dx = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dx = 0f },
+                    onDragEnd = { if (kotlin.math.abs(dx) > 48.dp.toPx()) onSwipe(dx < 0) },
+                ) { change, amount -> change.consume(); dx += amount }
+            }
+            .pointerInput(panelMode) {
+                if (panelMode) return@pointerInput
                 detectTransformGestures { _, pan, zoom, _ ->
                     val next = (scale * zoom).coerceIn(1f, 5f)
                     scale = next
@@ -401,6 +416,28 @@ private fun ZoomableSpread(
                         )
                     } ?: CircularProgressIndicator(color = Color.White)
                 }
+            }
+        }
+        // Guided view: only the panel shows; the rest of the page is covered in its gutter colour,
+        // following the zoom as it moves, so the neighbours never peek in.
+        val b0 = first
+        if (panelMode && b0 != null && panels.size > 1) {
+            val mask = if (ComicPanels.darkGutters) Color.Black else Color.White
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val r = panels[panel.coerceIn(0, panels.size - 1)]
+                val a = b0.width.toFloat() / b0.height
+                val dispW = if (boxW / boxH > a) boxH * a else boxW
+                val dispH = if (boxW / boxH > a) boxH else boxW / a
+                val left0 = (boxW - dispW) / 2f
+                val top0 = (boxH - dispH) / 2f
+                fun sx(x: Float) = boxW / 2f + (left0 + x * dispW - boxW / 2f) * scale + offset.x
+                fun sy(y: Float) = boxH / 2f + (top0 + y * dispH - boxH / 2f) * scale + offset.y
+                val pad = 4f
+                val l = sx(r.left) - pad; val t = sy(r.top) - pad; val rr = sx(r.right) + pad; val bb = sy(r.bottom) + pad
+                drawRect(mask, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Size(size.width, t.coerceAtLeast(0f)))
+                drawRect(mask, androidx.compose.ui.geometry.Offset(0f, bb), androidx.compose.ui.geometry.Size(size.width, (size.height - bb).coerceAtLeast(0f)))
+                drawRect(mask, androidx.compose.ui.geometry.Offset(0f, t), androidx.compose.ui.geometry.Size(l.coerceAtLeast(0f), bb - t))
+                drawRect(mask, androidx.compose.ui.geometry.Offset(rr, t), androidx.compose.ui.geometry.Size((size.width - rr).coerceAtLeast(0f), bb - t))
             }
         }
     }

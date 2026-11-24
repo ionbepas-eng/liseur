@@ -128,7 +128,7 @@ internal fun LiburuSettings(onOpenReadAloud: () -> Unit = {}) {
             val homeLayout by com.chmouel.liseur.ui.library.styles.LiburuPrefs.homeLayout.collectAsState()
             androidx.compose.runtime.LaunchedEffect(Unit) { com.chmouel.liseur.ui.library.styles.LiburuPrefs.loadHomeLayout(context) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("stack" to "Como ahora", "columns" to "A · Dos columnas", "band" to "B · Banda", "tiles" to "C · Fichas").forEach { (k, label) ->
+                listOf("stack" to "Normal", "columns" to "A · Dos columnas", "band" to "B · Banda", "tiles" to "C · Fichas").forEach { (k, label) ->
                     androidx.compose.material3.FilterChip(
                         selected = homeLayout == k,
                         onClick = { com.chmouel.liseur.ui.library.styles.LiburuPrefs.setHomeLayout(context, k) },

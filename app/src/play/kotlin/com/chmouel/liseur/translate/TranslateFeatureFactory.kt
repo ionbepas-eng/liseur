@@ -19,6 +19,7 @@ object TranslateFeatureFactory {
         requestFullSync = container::requestFullSync,
         offersSetup = true,
         services = listOf(
+            MyMemoryTranslationService(),
             DeviceTranslationService(context.applicationContext),
             MlKitTranslationService(context.applicationContext),
             GeminiTranslationService(container.serviceAccounts.gemini, container.appSettings),

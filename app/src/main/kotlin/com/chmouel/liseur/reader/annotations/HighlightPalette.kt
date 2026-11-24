@@ -76,7 +76,8 @@ data class HighlightPalette(
          * is room taken from the actions beside it. A reader who sorts
          * by colour ticks the others once.
          */
-        val DEFAULT_OFFERED: Set<HighlightTint> = setOf(HighlightTint.YELLOW)
+        // Liburuville: the web's four, ready from the start.
+        val DEFAULT_OFFERED: Set<HighlightTint> = setOf(HighlightTint.YELLOW, HighlightTint.PINK, HighlightTint.GREEN, HighlightTint.BLUE)
 
         /**
          * A palette read back from storage, made safe to use.

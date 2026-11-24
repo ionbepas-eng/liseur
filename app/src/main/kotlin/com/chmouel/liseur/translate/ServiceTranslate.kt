@@ -79,7 +79,7 @@ internal class ServiceTranslate(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override val ready: StateFlow<Boolean> = settings.settings
-        .map { s -> s.translationProvider?.let { resolve(s) } }
+        .map { s -> resolve(s) }
         .distinctUntilChanged()
         .flatMapLatest { it?.configured ?: flowOf(false) }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_AFTER_MS), false)

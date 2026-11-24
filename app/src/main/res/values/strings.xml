@@ -2374,4 +2374,6 @@
     <string name="liburu_bd_barcode">Barcode</string>
     <string name="liburu_bd_queued">Queued to download (waiting for Drive)</string>
     <string name="liburu_lib_audio">Audio</string>
+    <string name="liburu_translation_mymemory">MyMemory (free, no account)</string>
+    <string name="liburu_translation_mymemory_summary">Translates selected passages with MyMemory, the web app\'s free translator.</string>
 </resources>

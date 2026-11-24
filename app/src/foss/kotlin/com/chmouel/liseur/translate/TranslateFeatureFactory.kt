@@ -18,6 +18,7 @@ object TranslateFeatureFactory {
         accountClears = container.accountTranslationClears,
         requestFullSync = container::requestFullSync,
         services = listOf(
+            MyMemoryTranslationService(),
             DeviceTranslationService(context.applicationContext),
             ServerTranslationService(container.serverConnections, container.appSettings),
         ),

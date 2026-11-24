@@ -144,7 +144,9 @@ fun SelectionPopup(
             } else {
                 null
             },
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            // Liburuville: the web's dark bar, floating by the passage.
+            color = if (eInk) MaterialTheme.colorScheme.surfaceContainerHighest else Color(0xFF26231F),
+            contentColor = if (eInk) MaterialTheme.colorScheme.onSurface else Color(0xFFF3EEE6),
         ) {
             SelectionActionRow(
                 actions = actions,
@@ -272,6 +274,7 @@ internal fun SelectionActionRow(
                             tint = tint,
                             selected = tint == activeTint,
                             onClick = { actions.onHighlight(tint) },
+                            ringColor = androidx.compose.material3.LocalContentColor.current,
                         )
                     }
                 }

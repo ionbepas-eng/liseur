@@ -116,8 +116,10 @@ fun ContentsScreen(
     /** Null when this book has nowhere to sync to. */
     onSyncBook: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /** Liburuville: which tab to open on (0 contents, 1 bookmarks, 2 highlights, 3 notes). */
+    initialTab: Int = 0,
 ) {
-    var tab by rememberSaveable { mutableStateOf(ContentsTab.CONTENTS) }
+    var tab by rememberSaveable { mutableStateOf(ContentsTab.entries.getOrElse(initialTab) { ContentsTab.CONTENTS }) }
     // Which marks the reader has opened out to read in full. It lives here
     // rather than in AnnotationList because each tab is a separate branch of
     // the `when` below: switching tabs disposes the branch, and state saved

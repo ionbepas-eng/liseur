@@ -2300,4 +2300,6 @@
     <string name="liburu_bd_barcode">Código de barras</string>
     <string name="liburu_bd_queued">En cola para descargar (esperando conexión con Drive)</string>
     <string name="liburu_lib_audio">Audio</string>
+    <string name="liburu_translation_mymemory">MyMemory (gratis, sin cuenta)</string>
+    <string name="liburu_translation_mymemory_summary">Traduce las frases que selecciones con MyMemory, el traductor gratuito de la web.</string>
 </resources>

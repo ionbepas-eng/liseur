@@ -23,6 +23,13 @@ import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -572,6 +579,7 @@ internal fun ReaderScreen(
     val chromeTransition = remember { MutableTransitionState(false) }
     val chromeDrawn = { chromeTransition.currentState || chromeTransition.targetState || !chromeTransition.isIdle }
     var showToc by remember { mutableStateOf(false) }
+    var tocTab by remember { mutableStateOf(0) }
     var searchFor by remember { mutableStateOf<String?>(null) }
     var goToPage by remember { mutableStateOf(false) }
     var goToPercent by remember { mutableStateOf(false) }
@@ -4592,7 +4600,7 @@ internal fun ReaderScreen(
             exit = chromeExit,
             modifier = Modifier.align(Alignment.TopCenter).then(behindViewer),
         ) {
-            Column {
+            Column(Modifier.background(MaterialTheme.colorScheme.surface)) {
                 TopAppBar(
                     title = {
                         Text(
@@ -4611,35 +4619,6 @@ internal fun ReaderScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { searchFor = "" }) {
-                            Icon(
-                                Icons.Outlined.Search,
-                                contentDescription = stringResource(R.string.reader_search),
-                            )
-                        }
-                        // "Aa" is what a reader looks for and what every other
-                        // reading app draws here, so it stays — but it is a
-                        // picture of two letters, not a word, and TalkBack
-                        // announcing "Aa" describes nothing. The button says
-                        // what it opens instead.
-                        val typographyLabel = stringResource(R.string.reader_typography)
-                        IconButton(
-                            onClick = { sheet = ReaderSheet.TYPOGRAPHY },
-                            modifier = Modifier.semantics {
-                                contentDescription = typographyLabel
-                            },
-                        ) {
-                            Text(
-                                text = "Aa",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        IconButton(onClick = { showToc = true }) {
-                            Icon(
-                                Icons.AutoMirrored.Outlined.List,
-                                contentDescription = stringResource(R.string.reader_contents),
-                            )
-                        }
                         // The bar owns this corner while it is up, ribbon and
                         // all, so it owns the bookmark with it. Next to the
                         // corner, with only the overflow past it.
@@ -4867,6 +4846,29 @@ internal fun ReaderScreen(
                         actionIconContentColor = readingTheme.foreground,
                     ),
                 )
+                // Liburuville: Fable's row of named buttons under the title.
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    @Composable
+                    fun ChromeButton(label: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
+                        Column(
+                            Modifier.clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(46.dp)) {
+                                Box(contentAlignment = Alignment.Center) { icon() }
+                            }
+                            Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
+                    ChromeButton("Aspecto", { sheet = ReaderSheet.TYPOGRAPHY }) { Text("Aa", style = MaterialTheme.typography.titleMedium) }
+                    ChromeButton("Índice", { tocTab = 0; showToc = true }) { Icon(Icons.AutoMirrored.Outlined.List, null) }
+                    ChromeButton("Subrayados", { tocTab = 2; showToc = true }) { Icon(Icons.Outlined.Edit, null) }
+                    ChromeButton("Notas", { tocTab = 3; showToc = true }) { Icon(Icons.Outlined.EditNote, null) }
+                    ChromeButton("Buscar", { searchFor = "" }) { Icon(Icons.Outlined.Search, null) }
+                }
                 ChromeEdgeFade(theme = readingTheme, solidAtTop = true)
             }
         }
@@ -5966,6 +5968,7 @@ internal fun ReaderScreen(
             },
             onClose = { showToc = false },
             onSyncBook = if (syncable) onBookSyncAction.start else null,
+            initialTab = tocTab,
             onEntrySelected = { link ->
                 showToc = false
                 chromeVisible = false

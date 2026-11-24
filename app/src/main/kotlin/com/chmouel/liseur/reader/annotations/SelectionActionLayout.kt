@@ -124,7 +124,22 @@ data class SelectionActionLayout(val entries: List<SelectionActionEntry>) {
         .map { it.copy(style = SelectionActionStyle.BOTH, customIcon = null) } + default.hidden)
 
     companion object {
-        val default = SelectionActionLayout(SelectionAction.entries.map { SelectionActionEntry(it, it.defaultStyle) })
+        // Liburuville: as on the web — Nota, Consultar and Traducir by name, then the quiet icons.
+        val default = SelectionActionLayout(
+            listOf(
+                SelectionActionEntry(SelectionAction.NOTE, SelectionActionStyle.LABEL),
+                SelectionActionEntry(SelectionAction.LOOK_UP, SelectionActionStyle.LABEL, "Consultar"),
+                SelectionActionEntry(SelectionAction.TRANSLATE, SelectionActionStyle.LABEL),
+                SelectionActionEntry(SelectionAction.COMPANION, SelectionActionStyle.ICON),
+                SelectionActionEntry(SelectionAction.READ_ALOUD, SelectionActionStyle.ICON),
+                SelectionActionEntry(SelectionAction.COPY, SelectionActionStyle.ICON),
+                SelectionActionEntry(SelectionAction.SHARE, SelectionActionStyle.ICON),
+                SelectionActionEntry(SelectionAction.DELETE, SelectionActionStyle.ICON),
+            ) + listOf(
+                SelectionAction.SEARCH, SelectionAction.CITATION, SelectionAction.OPEN_WITH, SelectionAction.WEB_SEARCH,
+                SelectionAction.WIKIPEDIA, SelectionAction.OPEN_LIBRARY, SelectionAction.ASK_BRAVE, SelectionAction.DUCK_AI,
+            ).map { SelectionActionEntry(it, SelectionActionStyle.HIDDEN) },
+        )
 
         fun parse(value: String?): SelectionActionLayout {
             if (value == null) return default

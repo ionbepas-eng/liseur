@@ -189,6 +189,11 @@ internal fun TranslationSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         onBack = if (picking != null) ({ picking = null }) else null,
+        // Liburuville: a compact floating card over the page, as for a word's definition.
+        scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.08f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        sheetMaxWidth = 460.dp,
+        modifier = Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp),
     ) {
         Column(
             Modifier

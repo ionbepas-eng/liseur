@@ -2,6 +2,17 @@ package com.chmouel.liseur.ui.library.styles
 
 import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -82,6 +93,11 @@ object LiburuPrefs {
         prefs(context).edit().putString("name", name).putLong("profileT", at).apply()
     fun profileChangedAt(context: Context) = prefs(context).getLong("profileT", 0L)
     fun avatarFile(context: Context) = java.io.File(context.filesDir, "liburu-avatar.jpg")
+
+    /** How Home lays out goals, level and challenges on a wide screen (≥ 600 dp): auto, stack, columns, band, tiles. */
+    val homeLayout = kotlinx.coroutines.flow.MutableStateFlow("stack")
+    fun loadHomeLayout(context: Context) { homeLayout.value = (prefs(context).getString("homeLayout", "stack") ?: "stack").let { if (it == "auto") "stack" else it } }
+    fun setHomeLayout(context: Context, v: String) { prefs(context).edit().putString("homeLayout", v).apply(); homeLayout.value = v }
 
     /** Bumped whenever the photo changes, so Compose reloads it. */
     val avatarVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
@@ -196,6 +212,10 @@ internal fun LiburuHome(
         state.books.filter { (it.finishedAt ?: 0L) >= yearStart }.sortedByDescending { it.finishedAt }
     }
     val gutter = Modifier.padding(horizontal = 20.dp)
+    val wideHome = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
+    LaunchedEffect(Unit) { LiburuPrefs.loadHomeLayout(context) }
+    val chosen by LiburuPrefs.homeLayout.collectAsState()
+    val layout = if (!wideHome) "stack" else chosen
 
     LazyColumn(
         state = listState,
@@ -208,20 +228,37 @@ internal fun LiburuHome(
                 Column(Modifier.weight(1f)) {
                     val date = today.format(DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", locale))
                         .replaceFirstChar { it.titlecase(locale) }
-                    Text(date, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(date, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Text(
                         name.let { n ->
                             if (n.isNullOrBlank()) stringResource(R.string.liburu_hello_plain)
                             else stringResource(R.string.liburu_hello, n)
                         },
-                        style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                        style = (if (wideHome) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineLarge).copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 }
-                GoalRing(rhythm.minutesToday, goal, Modifier.size(64.dp))
-                Spacer(Modifier.width(12.dp))
-                Avatar(Modifier.size(64.dp))
-                Spacer(Modifier.width(4.dp))
-                actions()
+                // Liburuville: as on the web — sync, today's minutes, you. Search and Add live in the Library.
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                var syncing by remember { mutableStateOf(false) }
+                val ring = if (wideHome) 64.dp else 52.dp
+                Surface(
+                    onClick = { if (!syncing) { syncing = true; scope.launch { runCatching { container.driveStateSync.syncNow(force = true) }; syncing = false } } },
+                    shape = CircleShape, color = Color.Transparent,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                    modifier = Modifier.size(ring),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        androidx.compose.material3.Icon(
+                            if (syncing) Icons.Outlined.Sync else Icons.Outlined.CloudSync,
+                            "Sincronizar", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(ring * 0.42f),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                GoalRing(rhythm.minutesToday, goal, Modifier.size(ring))
+                Spacer(Modifier.width(10.dp))
+                Avatar(Modifier.size(ring))
             }
         }
         if (quote != null) {
@@ -269,6 +306,7 @@ internal fun LiburuHome(
             }
         }
         item(key = "lh:news") { LiburuNewsRow() }
+        if (layout == "stack") {
         item(key = "lh:goals") {
             GoalsCard(
                 rhythm = rhythm,
@@ -291,6 +329,11 @@ internal fun LiburuHome(
                         p.retos.forEach { RetoCard(it) }
                     }
                 }
+            }
+        }
+        } else {
+            item(key = "lh:dash") {
+                LiburuHomeDash(layout, rhythm, goal, reading.firstOrNull(), locale, onBookSelected, progress, gutter.fillMaxWidth())
             }
         }
         if (readThisYear.isNotEmpty()) {
@@ -590,5 +633,149 @@ private fun RetoCard(reto: LiburuProgress.Reto) {
 private fun ProgressBar(pct: Float, color: Color) {
     Box(Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
         Box(Modifier.fillMaxWidth(pct.coerceIn(0f, 1f)).height(10.dp).clip(RoundedCornerShape(5.dp)).background(color))
+    }
+}
+
+
+/** Liburuville: Home's goals, level and challenges laid out for a wide screen (A columns, B band, C tiles). */
+@Composable
+private fun LiburuHomeDash(
+    layout: String,
+    rhythm: Rhythm,
+    goal: Int,
+    current: Book?,
+    locale: Locale,
+    onContinue: (Book) -> Unit,
+    progress: LiburuProgress.Summary?,
+    modifier: Modifier,
+) {
+    val gap = 16.dp
+    when (layout) {
+        "columns" -> Row(modifier, horizontalArrangement = Arrangement.spacedBy(gap)) {
+            GoalsCard(rhythm, goal, current, locale, onContinue, Modifier.weight(1f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap)) {
+                progress?.let { p ->
+                    LevelCard(p.level, Modifier.fillMaxWidth())
+                    if (p.retos.isNotEmpty()) RetosCompact(p, Modifier.fillMaxWidth())
+                }
+            }
+        }
+        "tiles" -> Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                DashTile("Hoy", "${rhythm.minutesToday} min", Modifier.weight(1f).fillMaxHeight()) {
+                    ProgressBar(rhythm.minutesToday.toFloat() / goal.coerceAtLeast(1), MaterialTheme.colorScheme.primary)
+                    Text("objetivo $goal min", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DashTile("Racha", if (rhythm.streak == 1) "1 día" else "${rhythm.streak} días", Modifier.weight(1f).fillMaxHeight()) {
+                    WeekDots(rhythm, 16.dp)
+                    Text("récord ${rhythm.record}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                progress?.let { p ->
+                    DashTile("Nivel ${p.level.n}", p.level.name, Modifier.weight(1f).fillMaxHeight()) {
+                        ProgressBar(p.level.pct, MaterialTheme.colorScheme.primary)
+                        Text(if (p.level.to != null) "${p.level.xp} / ${p.level.to}" else "${p.level.xp} puntos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            progress?.takeIf { it.retos.isNotEmpty() }?.let { RetosCompact(it, Modifier.fillMaxWidth(), inRow = true) }
+        }
+        else -> Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+            GoalsBand(rhythm, goal, current, onContinue, Modifier.fillMaxWidth())
+            progress?.let { p ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    LevelCard(p.level, Modifier.weight(1f).fillMaxHeight())
+                    if (p.retos.isNotEmpty()) RetosCompact(p, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalsBand(rhythm: Rhythm, goal: Int, current: Book?, onContinue: (Book) -> Unit, modifier: Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(28.dp), modifier = modifier) {
+        Row(Modifier.padding(22.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(200.dp).aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val stroke = 12.dp.toPx()
+                    val d = size.width - stroke
+                    val topLeft = Offset(stroke / 2, stroke / 2)
+                    drawArc(track, 180f, 180f, false, topLeft, Size(d, d), style = Stroke(stroke, cap = StrokeCap.Round))
+                    val sweep = 180f * (rhythm.minutesToday.toFloat() / goal.coerceAtLeast(1)).coerceIn(0f, 1f)
+                    if (sweep > 0f) drawArc(accent, 180f, sweep, false, topLeft, Size(d, d), style = Stroke(stroke, cap = StrokeCap.Round))
+                }
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${rhythm.minutesToday}", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold))
+                    Text(" min", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(bottom = 6.dp))
+                }
+            }
+            Spacer(Modifier.width(24.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.liburu_goals), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                Text(stringResource(R.string.liburu_of_goal, goal), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                WeekDots(rhythm, 30.dp)
+                Text(
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.liburu_streak, rhythm.streak, rhythm.streak) + " · " +
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.liburu_record, rhythm.record, rhythm.record),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (current != null) {
+                    Button(
+                        onClick = { onContinue(current) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F1B17), contentColor = Color(0xFFF5F1E6)),
+                    ) { Text(stringResource(R.string.liburu_keep_reading) + " · " + current.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekDots(rhythm: Rhythm, size: androidx.compose.ui.unit.Dp) {
+    val accent = MaterialTheme.colorScheme.primary
+    val today = LocalDate.now().dayOfWeek.value - 1
+    Row(horizontalArrangement = Arrangement.spacedBy(size / 4)) {
+        listOf("L", "M", "X", "J", "V", "S", "D").forEachIndexed { i, d ->
+            val done = rhythm.week.getOrElse(i) { false }
+            Box(
+                Modifier.size(size).background(if (done) accent else Color.Transparent, CircleShape)
+                    .then(if (!done) Modifier.border(1.dp, if (i == today) accent else MaterialTheme.colorScheme.outlineVariant, CircleShape) else Modifier),
+                contentAlignment = Alignment.Center,
+            ) { if (size >= 24.dp) Text(d, style = MaterialTheme.typography.labelMedium, color = if (done) Color.White else MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+@Composable
+private fun DashTile(label: String, value: String, modifier: Modifier, extra: @Composable ColumnScope.() -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(24.dp), modifier = modifier) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            extra()
+        }
+    }
+}
+
+@Composable
+private fun RetosCompact(p: LiburuProgress.Summary, modifier: Modifier, inRow: Boolean = false) {
+    val green = Color(0xFF5B9A55)
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(24.dp), modifier = modifier) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Retos de ${p.monthName}", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+            val one: @Composable (LiburuProgress.Reto, Modifier) -> Unit = { r, m ->
+                Column(m, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(r.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(if (r.done) "✓" else "${r.value.toInt().coerceAtMost(r.target.toInt())}/${r.target.toInt()}", style = MaterialTheme.typography.labelLarge, color = if (r.done) green else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    ProgressBar((r.value / r.target).toFloat(), if (r.done) green else MaterialTheme.colorScheme.primary)
+                }
+            }
+            if (inRow) Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { p.retos.forEach { one(it, Modifier.weight(1f)) } }
+            else p.retos.forEach { one(it, Modifier.fillMaxWidth()) }
+        }
     }
 }

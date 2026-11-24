@@ -123,6 +123,20 @@ internal fun LiburuSettings(onOpenReadAloud: () -> Unit = {}) {
                     Swatch(color, swatchName(key), look.accent == key) { LiburuAppearance.setAccent(key) }
                 }
             }
+            // Liburuville: Home's layout on a tablet or a phone held sideways (≥ 600 dp).
+            Text("Inicio en pantallas grandes", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+            val homeLayout by com.chmouel.liseur.ui.library.styles.LiburuPrefs.homeLayout.collectAsState()
+            androidx.compose.runtime.LaunchedEffect(Unit) { com.chmouel.liseur.ui.library.styles.LiburuPrefs.loadHomeLayout(context) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("stack" to "Como ahora", "columns" to "A · Dos columnas", "band" to "B · Banda", "tiles" to "C · Fichas").forEach { (k, label) ->
+                    androidx.compose.material3.FilterChip(
+                        selected = homeLayout == k,
+                        onClick = { com.chmouel.liseur.ui.library.styles.LiburuPrefs.setHomeLayout(context, k) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            Text("Se aplica en la tablet y con el móvil en horizontal; en vertical el móvil no tiene ancho para columnas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 

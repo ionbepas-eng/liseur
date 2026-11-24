@@ -150,14 +150,22 @@ object LiburuEnrich {
      * The work's original title, from Wikidata: «Adiós a Berlín» is the Spanish label of «Goodbye to Berlin».
      * Only a match whose description names the author is taken, so a namesake never stands in.
      */
-    private fun originalTitle(title: String, author: String?, language: String?): String? {
+    private fun originalTitle(title: String, author: String?, language: String?, alt: String? = null): String? {
+        for (t in listOfNotNull(alt, title).distinct()) for (l in listOfNotNull(language?.take(2)?.lowercase(), "es", "en").distinct()) {
+            runCatching { wikidataOriginal(t, author, l) }.getOrNull()?.let { return it }
+        }
+        return null
+    }
+
+    private fun wikidataOriginal(title: String, author: String?, language: String?): String? {
         val surname = author?.split(Regex("[\\s,]+"))?.filter { it.length > 2 }?.lastOrNull()?.let(::norm) ?: return null
         val lang = language?.take(2)?.lowercase()?.takeIf { it.length == 2 } ?: "es"
         val url = "https://www.wikidata.org/w/api.php".toHttpUrl().newBuilder()
             .addQueryParameter("action", "wbsearchentities").addQueryParameter("search", title.split(Regex("[:(\\[]"))[0].trim())
             .addQueryParameter("language", lang).addQueryParameter("uselang", "en").addQueryParameter("type", "item")
             .addQueryParameter("limit", "7").addQueryParameter("format", "json").build()
-        val body = http.newCall(Request.Builder().url(url).header("User-Agent", "Liburuville/1.0 (lector personal)").build()).execute().use { r ->
+        val body = http.newCall(Request.Builder().url(url).header("User-Agent", "Liburuville/1.0 (https://github.com/ionbepas-eng/liseur; ionbepas-eng@users.noreply.github.com) okhttp")
+            .header("Api-User-Agent", "Liburuville/1.0 (https://github.com/ionbepas-eng/liseur)").build()).execute().use { r ->
             if (!r.isSuccessful) return null
             r.body.string()
         }
@@ -186,7 +194,7 @@ object LiburuEnrich {
         // lives on the original. Look the original up and keep whichever has more readers.
         var original: String? = null
         if ((doc?.optInt("ratings_count") ?: 0) < 40) runCatching {
-            val en = originalTitle(title, author, language)
+            val en = originalTitle(title, author, language, doc?.optString("title")?.takeIf { it.isNotBlank() })
             if (en != null && !sameTitle(en, title)) {
                 val hits = hc.gql(search, JSONObject().put("q", "${short(en)} ${author.orEmpty()}".trim()))?.optJSONObject("search")?.optJSONObject("results")?.optJSONArray("hits")
                 val alt = hits?.let { h -> (0 until h.length()).mapNotNull { h.getJSONObject(it).optJSONObject("document") } }
@@ -194,9 +202,9 @@ object LiburuEnrich {
                 if (alt != null && alt.optInt("ratings_count") > (doc?.optInt("ratings_count") ?: -1)) { doc = alt; original = alt.optString("title") }
             }
         }
-        val d = doc ?: return JSONObject().put("found", false).put("v", 2)
-        val id = d.optString("id").toIntOrNull() ?: return JSONObject().put("found", false).put("v", 2)
-        val out = JSONObject().put("found", true).put("v", 2).put("id", id).put("slug", d.optString("slug"))
+        val d = doc ?: return JSONObject().put("found", false).put("v", 4)
+        val id = d.optString("id").toIntOrNull() ?: return JSONObject().put("found", false).put("v", 4)
+        val out = JSONObject().put("found", true).put("v", 4).put("id", id).put("slug", d.optString("slug"))
             .apply { original?.let { put("original", it) } }
             .put("rating", d.optDouble("rating", 0.0)).put("ratingsCount", d.optInt("ratings_count"))
             .put("readers", d.optInt("users_read_count").takeIf { it > 0 } ?: d.optInt("users_count"))
@@ -204,7 +212,7 @@ object LiburuEnrich {
             .put("link", d.optString("slug").takeIf { it.isNotEmpty() }?.let { "https://hardcover.app/books/$it" }.orEmpty())
         runCatching {
             val r = hc.gql(
-                "query Opiniones(\$id: Int!) { user_books(where: {book_id: {_eq: \$id}, has_review: {_eq: true}}, order_by: {likes_count: desc}, limit: 12) { rating review_raw reviewed_at likes_count user { username } } }",
+                "query Opiniones(\$id: Int!) { user_books(where: {book_id: {_eq: \$id}, has_review: {_eq: true}}, order_by: {likes_count: desc}, limit: 30) { rating review_raw reviewed_at likes_count user { username image { url } } } }",
                 JSONObject().put("id", id),
             )
             val ub = r?.optJSONArray("user_books") ?: JSONArray()
@@ -213,7 +221,8 @@ object LiburuEnrich {
                 val x = ub.getJSONObject(i)
                 val text = x.optString("review_raw").takeIf { it.isNotBlank() && it != "null" } ?: continue
                 reviews.put(
-                    JSONObject().put("user", x.optJSONObject("user")?.optString("username") ?: "Lector")
+                    JSONObject().put("user", x.optJSONObject("user")?.optString("username")?.takeIf { it.isNotBlank() && it != "null" } ?: "Lector")
+                        .put("avatar", x.optJSONObject("user")?.optJSONObject("image")?.optString("url")?.takeIf { it.startsWith("http") }.orEmpty())
                         .put("rating", x.optDouble("rating", 0.0)).put("text", text.take(1200))
                         .put("date", x.optString("reviewed_at")),
                 )

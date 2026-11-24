@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -153,7 +154,7 @@ internal fun LiburuBookDetails(
     }
     // Like the web: fetched on the first visit and again after a month.
     LaunchedEffect(original.book.url) {
-        if (net == null || System.currentTimeMillis() - net.optLong("t") > LiburuEnrich.TTL || net.optJSONObject("hc")?.has("v") != true) refresh()
+        if (net == null || System.currentTimeMillis() - net.optLong("t") > LiburuEnrich.TTL || (net.optJSONObject("hc")?.optInt("v") ?: 0) < 4) refresh()
     }
     var editing by remember { mutableStateOf(false) }
     val book = details.book
@@ -976,9 +977,9 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("${5 - i} ★", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(44.dp))
                         Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-                            Box(Modifier.fillMaxWidth(c.toFloat() / max).height(8.dp).background(Gold))
+                            Box(Modifier.fillMaxWidth(c.toFloat() / counts.sum().coerceAtLeast(1)).height(8.dp).background(Gold))
                         }
-                        Text("$c", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp).width(28.dp))
+                        Text("${Math.round(c * 100f / counts.sum().coerceAtLeast(1))} %", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp).width(44.dp))
                     }
                 }
             }
@@ -989,29 +990,31 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 14.dp),
         )
-        val reviews = hc.optJSONArray("reviews")
-        if (reviews != null) {
-            for (i in 0 until reviews.length()) {
-                val r = reviews.getJSONObject(i)
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    Column(Modifier.padding(18.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(r.optString("user"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            Text(r.optString("date").take(10), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Fable-style: six review cards side by side and a «+» that opens them all in a pop-up.
+        val reviews = hc.optJSONArray("reviews")?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it) } }.orEmpty()
+        var all by remember { mutableStateOf(false) }
+        if (reviews.isNotEmpty()) {
+            Text("Reseñas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 20.dp, bottom = 10.dp))
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(reviews.take(6).size) { i -> ReviewCard(reviews[i], Modifier.width(280.dp).height(230.dp)) { all = true } }
+                item {
+                    Surface(
+                        onClick = { all = true }, shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.width(110.dp).height(230.dp),
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(52.dp)) {
+                                Box(contentAlignment = Alignment.Center) { Text("+", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.surface) }
+                            }
+                            Text("Ver todas", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp))
                         }
-                        r.optDouble("rating", 0.0).takeIf { it > 0 }?.let { Box(Modifier.padding(top = 6.dp)) { Stars(it, 18.dp) } }
-                        var open by remember { mutableStateOf(false) }
-                        Text(
-                            r.optString("text"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = if (open) Int.MAX_VALUE else 6,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 8.dp).clickable { open = !open },
-                        )
                     }
                 }
             }
+        } else {
+            Text("Todavía nadie ha escrito una reseña de este libro en Hardcover.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
         }
+        if (all) AllReviewsDialog(reviews, hc.optInt("ratingsCount")) { all = false }
         hc.optString("link").takeIf { it.isNotEmpty() }?.let { link ->
             TextButton(onClick = { openUrl(context, link) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 6.dp)) {
                 Text(stringResource(R.string.liburu_bd_all_reviews), fontWeight = FontWeight.SemiBold)
@@ -1300,5 +1303,69 @@ private fun DownloadLine(details: BookDetails, canDownload: Boolean, download: D
             Text("Último error: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 6.dp))
         }
         HorizontalDivider(Modifier.padding(top = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+
+@Composable
+private fun ReviewHeader(r: JSONObject) {
+    val user = r.optString("user").ifBlank { "Lector" }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), modifier = Modifier.size(38.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(user.take(1).uppercase(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                r.optString("avatar").takeIf { it.startsWith("http") }?.let { url ->
+                    coil3.compose.AsyncImage(model = url, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                }
+            }
+        }
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+            Text(user, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.optString("date").take(10), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun ReviewCard(r: JSONObject, modifier: Modifier, onOpen: () -> Unit) {
+    Surface(onClick = onOpen, shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ReviewHeader(r)
+            r.optDouble("rating", 0.0).takeIf { it > 0 }?.let { Stars(it, 16.dp) }
+            Text(r.optString("text"), style = MaterialTheme.typography.bodyMedium, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun AllReviewsDialog(reviews: List<JSONObject>, total: Int, onClose: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(0.92f).fillMaxHeight(0.88f),
+        ) {
+            Column {
+                Row(Modifier.padding(start = 22.dp, end = 8.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${reviews.size} reseñas" + if (total > 0) " · $total valoraciones" else "", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.IconButton(onClick = onClose) { Icon(Icons.Outlined.Close, stringResource(R.string.close)) }
+                }
+                LazyColumn(contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    items(reviews.size) { i ->
+                        val r = reviews[i]
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ReviewHeader(r)
+                            Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    r.optDouble("rating", 0.0).takeIf { it > 0 }?.let { Stars(it, 18.dp) }
+                                    var open by remember { mutableStateOf(false) }
+                                    Text(r.optString("text"), style = MaterialTheme.typography.bodyMedium, maxLines = if (open) Int.MAX_VALUE else 7, overflow = TextOverflow.Ellipsis)
+                                    if (!open && r.optString("text").length > 320) Text("Leer más", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { open = true })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

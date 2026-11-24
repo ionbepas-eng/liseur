@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -151,7 +153,7 @@ internal fun LiburuBookDetails(
     }
     // Like the web: fetched on the first visit and again after a month.
     LaunchedEffect(original.book.url) {
-        if (net == null || System.currentTimeMillis() - net.optLong("t") > LiburuEnrich.TTL) refresh()
+        if (net == null || System.currentTimeMillis() - net.optLong("t") > LiburuEnrich.TTL || net.optJSONObject("hc")?.has("v") != true) refresh()
     }
     var editing by remember { mutableStateOf(false) }
     val book = details.book
@@ -166,15 +168,48 @@ internal fun LiburuBookDetails(
     var tab by rememberSaveable(book.url) { mutableStateOf(0) }
     val pad = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp)
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // Liburuville: as in Fable, the cover stays put behind and the card slides up over it.
+    val sheetColor = MaterialTheme.colorScheme.background.takeIf { it.alpha > 0.99f } ?: MaterialTheme.colorScheme.surfaceContainerLow
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val overlap = with(density) { 28.dp.toPx() }
+    var heroPx by remember { mutableStateOf(with(density) { 400.dp.toPx() }.toInt()) }
+    val scrollPx by remember { derivedStateOf { if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset.toFloat() else Float.MAX_VALUE } }
+    val sheetTop by remember {
+        derivedStateOf {
+            val info = list.layoutInfo.visibleItemsInfo
+            info.firstOrNull { it.key == "head" }?.offset?.toFloat()
+                ?: if (list.firstVisibleItemIndex >= 1) -overlap else (heroPx - overlap)
+        }
+    }
+    Box(Modifier.fillMaxSize().background(sheetColor)) {
+        Box(
+            Modifier.fillMaxWidth()
+                .onSizeChanged { heroPx = it.height }
+                .graphicsLayer {
+                    val sp = scrollPx.coerceAtMost(heroPx.toFloat())
+                    translationY = -sp * 0.45f
+                    alpha = (1f - sp / heroPx.coerceAtLeast(1)).coerceIn(0f, 1f)
+                    val k = 1f - 0.08f * (sp / heroPx.coerceAtLeast(1))
+                    scaleX = k; scaleY = k
+                },
+        ) { Hero(details, heroColor) }
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val r = 28.dp.toPx()
+            drawRoundRect(
+                sheetColor,
+                topLeft = androidx.compose.ui.geometry.Offset(0f, sheetTop),
+                size = androidx.compose.ui.geometry.Size(size.width, size.height - sheetTop + r * 2),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+            )
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             state = list,
             horizontalAlignment = Alignment.CenterHorizontally,
             contentPadding = PaddingValues(bottom = 48.dp),
         ) {
-            item(key = "hero") { Hero(details, heroColor) }
-            item(key = "head") { Head(details, pad.padding(top = 22.dp)) }
+            item(key = "hero") { Spacer(Modifier.fillMaxWidth().height(with(density) { (heroPx - overlap).coerceAtLeast(0f).toDp() })) }
+            item(key = "head") { Head(details, pad.padding(top = 30.dp)) }
             item(key = "actions") {
                 Actions(details, etaSeconds, canDownload, download, onRead, onDownload, onSetReadingChoice, onSetEvaluation, pad.padding(top = 18.dp))
             }
@@ -185,14 +220,14 @@ internal fun LiburuBookDetails(
                         edgePadding = 0.dp,
                         containerColor = Color.Transparent,
                     ) {
-                        listOf(R.string.liburu_bd_tab_about, R.string.liburu_bd_tab_notes, R.string.liburu_bd_tab_sessions)
+                        listOf(stringResource(R.string.liburu_bd_tab_about), "Comunidad", stringResource(R.string.liburu_bd_tab_notes), stringResource(R.string.liburu_bd_tab_sessions))
                             .forEachIndexed { i, label ->
                                 Tab(
                                     selected = tab == i,
                                     onClick = { tab = i },
                                     text = {
                                         Text(
-                                            stringResource(label),
+                                            label,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = if (tab == i) FontWeight.SemiBold else FontWeight.Normal,
                                         )
@@ -251,9 +286,6 @@ internal fun LiburuBookDetails(
                         }
                     }
                     item(key = "facts") { Facts(details, sessions, etaSeconds, pad) }
-                    net?.optJSONObject("hc")?.takeIf { it.optBoolean("found") }?.let { hc ->
-                        item(key = "community") { Community(hc, pad) }
-                    }
                     item(key = "biblio") { Biblio(details, net, pad) }
                     net?.optJSONArray("byAuthor")?.takeIf { it.length() > 0 }?.let { arr ->
                         item(key = "byauthor") { ByAuthor(details.book.author.orEmpty(), arr, pad) }
@@ -284,6 +316,19 @@ internal fun LiburuBookDetails(
                     }
                 }
                 1 -> {
+                    val hc = net?.optJSONObject("hc")?.takeIf { it.optBoolean("found") }
+                    if (hc != null) item(key = "community") { Community(hc, pad.padding(top = 18.dp)) }
+                    else item(key = "nocommunity") {
+                        Column(pad.padding(top = 24.dp)) {
+                            Text(
+                                if (fetching) "Buscando en Hardcover…" else "No he encontrado este libro en Hardcover.",
+                                style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (!fetching) TextButton(onClick = refresh, contentPadding = PaddingValues(0.dp)) { Text(stringResource(R.string.liburu_bd_refresh), fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
+                }
+                2 -> {
                     item(key = "review") { PersonalEvaluationCard(details, onSetEvaluation, pad.padding(top = 18.dp)) }
                     val shown = marks.filter { it.kind != "BOOKMARK" }
                     if (shown.isEmpty()) {
@@ -907,6 +952,9 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
     val readers = hc.optInt("readers")
     Column(modifier) {
         SectionTitle(stringResource(R.string.liburu_bd_community))
+        hc.optString("original").takeIf { it.isNotBlank() }?.let {
+            Text("De la edición original, «$it»", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+        }
         if (rating > 0) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(String.format(java.util.Locale.getDefault(), if (rating % 1.0 == 0.0) "%.0f" else "%.1f", rating), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.SemiBold)
@@ -943,7 +991,7 @@ private fun Community(hc: JSONObject, modifier: Modifier) {
         )
         val reviews = hc.optJSONArray("reviews")
         if (reviews != null) {
-            for (i in 0 until minOf(reviews.length(), 3)) {
+            for (i in 0 until reviews.length()) {
                 val r = reviews.getJSONObject(i)
                 Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Column(Modifier.padding(18.dp)) {

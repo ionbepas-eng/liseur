@@ -368,6 +368,7 @@ fun LibraryScreen(
         }
     }
     val openShelfBook: (Book) -> Unit = { book -> openBook(book, resumeListening = false) }
+    androidx.compose.runtime.SideEffect { LiburuQuickOpen.open = openShelfBook }
     // One row above the books, whatever style is showing. Whether it
     // belongs at all is decided with the state (continueListeningFor), so
     // this only draws it.
@@ -1077,8 +1078,9 @@ fun LibraryScreen(
                         quote = homeQuote,
                         onOpenQuote = onOpenQuote,
                         onAnotherQuote = onAnotherQuote,
-                        onBookSelected = openShelfBook,
-                        onBookLongPress = { sheetBook = it },
+                        onBookSelected = onOpenBookDetails,
+                        onBookLongPress = openShelfBook,
+                        onRead = openShelfBook,
                         onBrowseAll = {
                             onSetReadingFilter(setOf(LibraryFilterOption.UNREAD))
                             showCatalogue(false)
@@ -2536,7 +2538,7 @@ internal fun BookCard(
                 onClick = { if (selecting) LiburuSelection.toggle(book.url) else onClick() },
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onLongClick()
+                    if (selecting) onLongClick() else LiburuQuickOpen.open?.invoke(book) ?: onLongClick()
                 },
                 onClickLabel = stringResource(R.string.read_book),
                 onLongClickLabel = stringResource(R.string.book_actions),

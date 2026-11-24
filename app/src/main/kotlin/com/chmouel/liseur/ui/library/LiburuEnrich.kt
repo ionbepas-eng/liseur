@@ -71,7 +71,7 @@ object LiburuEnrich {
             gb?.let { out.put("gb", it) }
             val by = runCatching { byAuthor(title, author) }.getOrNull()
             by?.let { out.put("byAuthor", it) }
-            val hc = runCatching { hardcover(context, title, author, gb?.optString("isbn13")?.takeIf { it.isNotEmpty() } ?: isbn) }.getOrNull()
+            val hc = runCatching { hardcover(context, title, author, gb?.optString("isbn13")?.takeIf { it.isNotEmpty() } ?: isbn, language) }.getOrNull()
             hc?.let { out.put("hc", it) }
             val ok = gb != null || hc != null || (by?.length() ?: 0) > 0
             if (ok) put(context, bookUrl, out)
@@ -146,7 +146,33 @@ object LiburuEnrich {
         return out
     }
 
-    private fun hardcover(context: Context, title: String, author: String?, isbn: String?): JSONObject? {
+    /**
+     * The work's original title, from Wikidata: «Adiós a Berlín» is the Spanish label of «Goodbye to Berlin».
+     * Only a match whose description names the author is taken, so a namesake never stands in.
+     */
+    private fun originalTitle(title: String, author: String?, language: String?): String? {
+        val surname = author?.split(Regex("[\\s,]+"))?.filter { it.length > 2 }?.lastOrNull()?.let(::norm) ?: return null
+        val lang = language?.take(2)?.lowercase()?.takeIf { it.length == 2 } ?: "es"
+        val url = "https://www.wikidata.org/w/api.php".toHttpUrl().newBuilder()
+            .addQueryParameter("action", "wbsearchentities").addQueryParameter("search", title.split(Regex("[:(\\[]"))[0].trim())
+            .addQueryParameter("language", lang).addQueryParameter("uselang", "en").addQueryParameter("type", "item")
+            .addQueryParameter("limit", "7").addQueryParameter("format", "json").build()
+        val body = http.newCall(Request.Builder().url(url).header("User-Agent", "Liburuville/1.0 (lector personal)").build()).execute().use { r ->
+            if (!r.isSuccessful) return null
+            r.body.string()
+        }
+        val hits = JSONObject(body).optJSONArray("search") ?: return null
+        for (i in 0 until hits.length()) {
+            val h = hits.getJSONObject(i)
+            val label = h.optJSONObject("display")?.optJSONObject("label")
+            val desc = norm(h.optJSONObject("display")?.optJSONObject("description")?.optString("value").orEmpty())
+            if (label?.optString("language") != "en" || !desc.contains(surname)) continue
+            return label.optString("value").takeIf { it.isNotBlank() }
+        }
+        return null
+    }
+
+    private fun hardcover(context: Context, title: String, author: String?, isbn: String?, language: String? = null): JSONObject? {
         val hc = HardcoverSync(context, http)
         val search = "query Buscar(\$q: String!) { search(query: \$q, query_type: \"Book\", per_page: 6, page: 1) { results } }"
         var doc: JSONObject? = null
@@ -156,16 +182,29 @@ object LiburuEnrich {
             doc = if (q == isbn) docs.firstOrNull() else docs.firstOrNull { sameTitle(it.optString("title"), title) }
             if (doc != null) break
         }
-        if (doc == null) return JSONObject().put("found", false)
-        val id = doc.optString("id").toIntOrNull() ?: return JSONObject().put("found", false)
-        val out = JSONObject().put("found", true).put("id", id).put("slug", doc.optString("slug"))
-            .put("rating", doc.optDouble("rating", 0.0)).put("ratingsCount", doc.optInt("ratings_count"))
-            .put("readers", doc.optInt("users_read_count").takeIf { it > 0 } ?: doc.optInt("users_count"))
-            .put("genres", doc.optJSONArray("genres") ?: JSONArray())
-            .put("link", doc.optString("slug").takeIf { it.isNotEmpty() }?.let { "https://hardcover.app/books/$it" }.orEmpty())
+        // A translation often stands alone on Hardcover with a handful of ratings; the community
+        // lives on the original. Look the original up and keep whichever has more readers.
+        var original: String? = null
+        if ((doc?.optInt("ratings_count") ?: 0) < 40) runCatching {
+            val en = originalTitle(title, author, language)
+            if (en != null && !sameTitle(en, title)) {
+                val hits = hc.gql(search, JSONObject().put("q", "${short(en)} ${author.orEmpty()}".trim()))?.optJSONObject("search")?.optJSONObject("results")?.optJSONArray("hits")
+                val alt = hits?.let { h -> (0 until h.length()).mapNotNull { h.getJSONObject(it).optJSONObject("document") } }
+                    ?.filter { sameTitle(it.optString("title"), en) }?.maxByOrNull { it.optInt("ratings_count") }
+                if (alt != null && alt.optInt("ratings_count") > (doc?.optInt("ratings_count") ?: -1)) { doc = alt; original = alt.optString("title") }
+            }
+        }
+        val d = doc ?: return JSONObject().put("found", false).put("v", 2)
+        val id = d.optString("id").toIntOrNull() ?: return JSONObject().put("found", false).put("v", 2)
+        val out = JSONObject().put("found", true).put("v", 2).put("id", id).put("slug", d.optString("slug"))
+            .apply { original?.let { put("original", it) } }
+            .put("rating", d.optDouble("rating", 0.0)).put("ratingsCount", d.optInt("ratings_count"))
+            .put("readers", d.optInt("users_read_count").takeIf { it > 0 } ?: d.optInt("users_count"))
+            .put("genres", d.optJSONArray("genres") ?: JSONArray())
+            .put("link", d.optString("slug").takeIf { it.isNotEmpty() }?.let { "https://hardcover.app/books/$it" }.orEmpty())
         runCatching {
             val r = hc.gql(
-                "query Opiniones(\$id: Int!) { user_books(where: {book_id: {_eq: \$id}, has_review: {_eq: true}}, order_by: {likes_count: desc}, limit: 5) { rating review_raw reviewed_at likes_count user { username } } }",
+                "query Opiniones(\$id: Int!) { user_books(where: {book_id: {_eq: \$id}, has_review: {_eq: true}}, order_by: {likes_count: desc}, limit: 12) { rating review_raw reviewed_at likes_count user { username } } }",
                 JSONObject().put("id", id),
             )
             val ub = r?.optJSONArray("user_books") ?: JSONArray()

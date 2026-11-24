@@ -1,6 +1,7 @@
 package com.chmouel.liseur.ui.library
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -158,7 +159,7 @@ internal fun ShelvesOverview(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(on, key = { it.url }) { book ->
-                    Column(Modifier.clickable { onOpenBook(book) }) {
+                    Column(Modifier.combinedClickable(onClick = { onOpenBook(book) }, onLongClick = { LiburuQuickOpen.open?.invoke(book) })) {
                         BookCover(book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
                         Text(book.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                         book.author?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }

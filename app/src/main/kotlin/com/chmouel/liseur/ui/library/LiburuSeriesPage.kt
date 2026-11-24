@@ -3,6 +3,7 @@ package com.chmouel.liseur.ui.library
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,7 +128,7 @@ fun LiburuSeriesPage(
                 System.currentTimeMillis() - b.addedAt < 14 * 86_400_000L -> "Nuevo"
                 else -> ""
             }
-            Row(Modifier.widthIn(max = 720.dp).fillMaxWidth().clickable { onDetails(b) }.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.widthIn(max = 720.dp).fillMaxWidth().combinedClickable(onClick = { onDetails(b) }, onLongClick = { LiburuQuickOpen.open?.invoke(b) ?: onRead(b) }).padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 BookCover(b, Modifier.width(58.dp).aspectRatio(2f / 3f))
                 Column(Modifier.weight(1f).padding(start = 14.dp)) {
                     v.index?.let { Text("Libro " + (if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold) }

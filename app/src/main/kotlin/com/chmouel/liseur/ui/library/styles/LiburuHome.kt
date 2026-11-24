@@ -2,6 +2,7 @@ package com.chmouel.liseur.ui.library.styles
 
 import android.content.Context
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.ColumnScope
@@ -173,6 +174,7 @@ internal fun LiburuHome(
     onAnotherQuote: () -> Unit,
     onBookSelected: (Book) -> Unit,
     onBookLongPress: (Book) -> Unit,
+    onRead: (Book) -> Unit = onBookSelected,
     onBrowseAll: () -> Unit,
     bottomInset: Dp,
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
@@ -313,7 +315,7 @@ internal fun LiburuHome(
                 goal = goal,
                 current = reading.firstOrNull(),
                 locale = locale,
-                onContinue = onBookSelected,
+                onContinue = onRead,
                 modifier = gutter.fillMaxWidth(),
             )
         }
@@ -333,7 +335,7 @@ internal fun LiburuHome(
         }
         } else {
             item(key = "lh:dash") {
-                LiburuHomeDash(layout, rhythm, goal, reading.firstOrNull(), locale, onBookSelected, progress, gutter.fillMaxWidth())
+                LiburuHomeDash(layout, rhythm, goal, reading.firstOrNull(), locale, onRead, progress, gutter.fillMaxWidth())
             }
         }
         if (readThisYear.isNotEmpty()) {
@@ -395,7 +397,7 @@ private fun ContinueCard(book: Book, progression: Double, onOpen: (Book) -> Unit
         color = Color(0xFF2B2A27),
         contentColor = Color.White,
         shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.width(320.dp).clickable { onOpen(book) },
+        modifier = Modifier.width(320.dp).clip(RoundedCornerShape(28.dp)).combinedClickable(onClick = { onOpen(book) }, onLongClick = { onLong(book) }),
     ) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             BookCover(book, Modifier.width(78.dp).aspectRatio(2f / 3f))
@@ -415,7 +417,7 @@ private fun ContinueCard(book: Book, progression: Double, onOpen: (Book) -> Unit
 
 @Composable
 private fun NextBook(book: Book, onOpen: (Book) -> Unit) {
-    Column(Modifier.width(140.dp).clickable { onOpen(book) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.width(140.dp).combinedClickable(onClick = { onOpen(book) }, onLongClick = { com.chmouel.liseur.ui.library.LiburuQuickOpen.open?.invoke(book) }), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         BookCover(book, Modifier.fillMaxWidth().aspectRatio(2f / 3f))
         Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         val line = book.seriesName?.let { s -> book.seriesIndex?.let { "$s · ${stringResourceBook(it)}" } ?: s } ?: book.author

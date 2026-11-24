@@ -139,3 +139,9 @@ private fun Chip(text: String, onClick: () -> Unit) {
         Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }
+
+
+/** Liburuville: a tap on a book shows its card; a long press opens the book itself. Set by the Library screen. */
+internal object LiburuQuickOpen {
+    @Volatile var open: ((com.chmouel.liseur.data.db.Book) -> Unit)? = null
+}

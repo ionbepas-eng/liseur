@@ -188,7 +188,7 @@ private fun suggestions(
 private fun Band(content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(top = 16.dp)
-            .background(Color.White.copy(alpha = 0.3f))
+            .background(com.chmouel.liseur.ui.theme.liburuGlass(0.3f))
             .padding(top = 20.dp, bottom = 22.dp),
     ) { content() }
 }
@@ -223,7 +223,7 @@ private fun ClassicsSection(onMore: (String, String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.liburu_dc_classics), style = MaterialTheme.typography.headlineMedium)
         Text(stringResource(R.string.liburu_dc_classics_sub), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.55f)) {
+        Surface(shape = RoundedCornerShape(50), color = com.chmouel.liseur.ui.theme.liburuGlass(0.55f)) {
             Row(Modifier.padding(4.dp)) {
                 LiburuClassics.SOURCES.forEach { src ->
                     val on = src.key == sourceKey
@@ -241,7 +241,7 @@ private fun ClassicsSection(onMore: (String, String) -> Unit) {
                 shape = RoundedCornerShape(14.dp),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { asked = query.trim() }),
-                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color.White.copy(alpha = 0.55f), focusedContainerColor = Color.White.copy(alpha = 0.7f)),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(unfocusedContainerColor = com.chmouel.liseur.ui.theme.liburuGlass(0.55f), focusedContainerColor = com.chmouel.liseur.ui.theme.liburuGlass(0.7f)),
             )
             Button(onClick = { asked = query.trim() }, colors = ButtonDefaults.buttonColors(containerColor = ink, contentColor = onInk())) { Text("Buscar") }
         }

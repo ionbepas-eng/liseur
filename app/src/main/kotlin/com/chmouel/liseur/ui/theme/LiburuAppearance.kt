@@ -152,7 +152,10 @@ internal fun ColorScheme.liburu(look: LiburuLook, dark: Boolean): ColorScheme {
     LiburuAppearance.wallpaper(look)?.let { wall ->
         // The gradient is drawn behind the screens; the page itself turns clear
         // and the cards become a frosted version of the chosen paper.
-        val paper = bg ?: if (dark) Color(0xFF1A1917) else Color(0xFFFBF8F1)
+        // A dark wallpaper gets dark paper, whatever background was chosen for a light one: light
+        // cards under light ink were unreadable (Medianoche, Bosque…). Tinted by the wallpaper itself.
+        val paper = if (wall.dark) androidx.compose.ui.graphics.lerp(wall.colors[1], Color.Black, 0.28f)
+            else bg?.takeIf { it.luminance() > 0.4f } ?: if (dark) Color(0xFF1A1917) else Color(0xFFFBF8F1)
         scheme = scheme.copy(
             background = Color.Transparent,
             surface = Color.Transparent,
@@ -169,3 +172,13 @@ internal fun ColorScheme.liburu(look: LiburuLook, dark: Boolean): ColorScheme {
     }
     return scheme
 }
+
+
+/**
+ * Liburuville: the frosted white of the cards, as it should be on this theme: white over a light
+ * wallpaper, a faint light veil over a dark one so the light ink on it stays legible.
+ */
+@androidx.compose.runtime.Composable
+fun liburuGlass(alpha: Float): Color =
+    if (androidx.compose.material3.MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) Color.White.copy(alpha = alpha * 0.14f)
+    else Color.White.copy(alpha = alpha)

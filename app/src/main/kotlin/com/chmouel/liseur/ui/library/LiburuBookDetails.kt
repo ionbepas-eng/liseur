@@ -1103,37 +1103,25 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
             .replace(Regex("[^a-z0-9]+"), "-").trim('-')
         "https://www.ivoox.com/${slug}_sb.html?sb=${enc(x.trim())}"
     }
+    // Liburuville: the shops are gone; communities, podcasts and videos as cards, «Plataforma · Libro/Autor».
     val defaults = listOf(
-        R.string.liburu_wf_buy to listOf(
-            "Play Libros" to "https://play.google.com/store/search?q=$q&c=books",
-            "Kobo" to "https://www.kobo.com/es/es/search?query=$q",
-            "Amazon" to "https://www.amazon.es/s?k=$q&i=digital-text",
-            "Casa del Libro" to "https://www.casadellibro.com/?q=$q",
-            "Librerías independientes" to "https://www.todostuslibros.com/busquedas?keyword=$q",
-        ),
-        R.string.liburu_wf_audio to listOf(
-            "Libro.fm (sin DRM)" to "https://libro.fm/search?q=$q",
-            "Storytel" to "https://www.storytel.com/es/search?query=$q",
-        ),
-        R.string.liburu_wf_free to listOf(
-            "eBiblio (préstamo)" to "https://ebiblio.es",
-            "Project Gutenberg" to "https://www.gutenberg.org/ebooks/search/?query=$q",
-            "textos.info" to "https://www.google.com/search?q=${enc("site:textos.info $t $a")}",
-        ),
         R.string.liburu_wf_communities to listOf(
             "Babelio" to "https://www.babelio.com/es/resrecherche.php?Recherche=$q",
+            "Margins" to "https://margins.app/search?q=$q",
+            "Fable" to "https://fable.co/search?q=$q",
             "Goodreads" to (isbn?.let { "https://www.goodreads.com/book/isbn/$it" } ?: "https://www.goodreads.com/search?q=$q"),
             "Hardcover" to "https://hardcover.app/search?q=$q",
-        ),
-        R.string.liburu_wf_reviews to listOf(
             "Lecturalia" to "https://www.lecturalia.com/buscar?q=$q",
             "Qué libro leo" to "https://quelibroleo.com/buscar?q=$q",
         ),
         R.string.liburu_wf_podcasts to (
-            listOf("Spotify · el libro" to "https://open.spotify.com/search/${enc("$t $a".trim())}/episodes", "iVoox · el libro" to ivoox(t)) +
-                (if (a.isNotBlank()) listOf("Spotify · el autor" to "https://open.spotify.com/search/${enc(a)}/episodes", "iVoox · el autor" to ivoox(a)) else emptyList())
+            listOf("Spotify · Libro" to "https://open.spotify.com/search/${enc("$t $a".trim())}/episodes", "iVoox · Libro" to ivoox(t)) +
+                (if (a.isNotBlank()) listOf("Spotify · Autor" to "https://open.spotify.com/search/${enc(a)}/episodes", "iVoox · Autor" to ivoox(a)) else emptyList())
             ),
-        R.string.liburu_wf_videos to (if (a.isNotBlank()) listOf("Entrevistas del autor en YouTube" to "https://www.youtube.com/results?search_query=${enc("$a entrevista")}") else emptyList()),
+        R.string.liburu_wf_videos to (
+            listOf("YouTube · Libro" to "https://www.youtube.com/results?search_query=${enc("$t $a reseña".trim())}") +
+                (if (a.isNotBlank()) listOf("YouTube · Autor" to "https://www.youtube.com/results?search_query=${enc("$a entrevista")}") else emptyList())
+            ),
     )
     val linksVersion by WhereLinks.version.collectAsState()
     val fill = { tpl: String ->
@@ -1159,17 +1147,8 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
                     modifier = Modifier.clickable { editingGroup = label },
                 )
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                links.forEach { (name, url) ->
-                    Surface(
-                        onClick = { openUrl(context, url) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.Transparent,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    ) {
-                        Text("$name ↗", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
-                    }
-                }
+            androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(links.size) { i -> val (name, url) = links[i]; WhereCard(name, url) { openUrl(context, url) } }
             }
         }
     }
@@ -1365,6 +1344,56 @@ private fun AllReviewsDialog(reviews: List<JSONObject>, total: Int, onClose: () 
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+/**
+ * Liburuville: a place to go as a card — the site's own icon, drawn in two tones of the reading
+ * theme (its accent for the ink, the card for the paper) so every logo sits in whatever background
+ * is chosen, and the platform's name with «Libro» or «Autor» when the link is about one of them.
+ */
+@Composable
+private fun WhereCard(name: String, url: String, onClick: () -> Unit) {
+    val platform = name.substringBefore(" · ")
+    val about = name.substringAfter(" · ", "").takeIf { it.isNotBlank() }
+    val host = runCatching { java.net.URI(url).host?.removePrefix("www.")?.removePrefix("open.") }.getOrNull().orEmpty()
+    val card = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 1f)
+    val ink = MaterialTheme.colorScheme.primary
+    val duotone = remember(card, ink) {
+        val l = floatArrayOf(0.299f, 0.587f, 0.114f)
+        fun row(c: Float, i: Float) = floatArrayOf((c - i) * l[0], (c - i) * l[1], (c - i) * l[2], 0f, i * 255f)
+        androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+            androidx.compose.ui.graphics.ColorMatrix(
+                row(card.red, ink.red) + row(card.green, ink.green) + row(card.blue, ink.blue) + floatArrayOf(0f, 0f, 0f, 1f, 0f),
+            ),
+        )
+    }
+    Surface(
+        onClick = onClick, shape = RoundedCornerShape(18.dp), color = card,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.width(112.dp),
+    ) {
+        Column(Modifier.padding(vertical = 14.dp, horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(ink.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+                Text(platform.take(1), style = MaterialTheme.typography.titleLarge, color = ink)
+                if (host.isNotBlank()) coil3.compose.AsyncImage(
+                    model = "https://www.google.com/s2/favicons?domain=$host&sz=128",
+                    contentDescription = null,
+                    colorFilter = duotone,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                )
+            }
+            Text(platform, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            if (about != null) {
+                Surface(shape = RoundedCornerShape(50), color = ink.copy(alpha = 0.12f)) {
+                    Text(about, style = MaterialTheme.typography.labelSmall, color = ink, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                }
+            } else {
+                Text("↗", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -173,7 +173,7 @@ internal fun LiburuBookDetails(
     // With a wallpaper, the card takes its light tone (pradera, océano…), so it changes with the theme.
     val look by com.chmouel.liseur.ui.theme.LiburuAppearance.look.collectAsState()
     val wall = com.chmouel.liseur.ui.theme.LiburuAppearance.wallpaper(look)?.takeIf { it.key != com.chmouel.liseur.ui.theme.LiburuAppearance.IMAGE }
-    val sheetColor = wall?.let { w -> if (w.dark) w.colors[1] else w.colors.first() }
+    val sheetColor = wall?.let { w -> if (w.dark) androidx.compose.ui.graphics.lerp(w.colors[1], Color.Black, 0.28f) else androidx.compose.ui.graphics.lerp(w.colors.first(), Color(0xFFFBF8F1), 0.55f) }
         ?: MaterialTheme.colorScheme.background.takeIf { it.alpha > 0.99f } ?: MaterialTheme.colorScheme.surfaceContainerLow
     val density = androidx.compose.ui.platform.LocalDensity.current
     val overlap = with(density) { 28.dp.toPx() }

@@ -155,7 +155,8 @@ internal fun ColorScheme.liburu(look: LiburuLook, dark: Boolean): ColorScheme {
         // A dark wallpaper gets dark paper, whatever background was chosen for a light one: light
         // cards under light ink were unreadable (Medianoche, Bosque…). Tinted by the wallpaper itself.
         val paper = if (wall.dark) androidx.compose.ui.graphics.lerp(wall.colors[1], Color.Black, 0.28f)
-            else bg?.takeIf { it.luminance() > 0.4f } ?: if (dark) Color(0xFF1A1917) else Color(0xFFFBF8F1)
+            // As on the web: over a wallpaper the cards are a neutral cream, not the chosen background.
+            else Color(0xFFFBF8F1)
         scheme = scheme.copy(
             background = Color.Transparent,
             surface = Color.Transparent,

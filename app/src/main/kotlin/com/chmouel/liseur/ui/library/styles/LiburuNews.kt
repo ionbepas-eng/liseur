@@ -162,7 +162,7 @@ internal fun LiburuNewsRow(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 20.dp),
         )
         LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(items, key = { it.link }) { item ->
+            items(items.distinctBy { it.link }, key = { it.link }) { item ->
                 Column(
                     Modifier.width(280.dp).clickable {
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.link))) }

@@ -233,13 +233,13 @@ internal fun FanCard(books: List<Book>, title: String, subtitle: String, onClick
     Surface(
         shape = RoundedCornerShape(28.dp),
         // As on the web: a translucent card on the page, the covers on near-white.
-        color = Color.White.copy(alpha = 0.42f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+        color = com.chmouel.liseur.ui.theme.liburuGlass(0.42f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, com.chmouel.liseur.ui.theme.liburuGlass(0.5f)),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     ) {
         Column {
             androidx.compose.foundation.layout.BoxWithConstraints(
-                Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.72f)).clipToBounds(),
+                Modifier.fillMaxWidth().background(com.chmouel.liseur.ui.theme.liburuGlass(0.72f)).clipToBounds(),
                 contentAlignment = Alignment.Center,
             ) {
                 val w = maxWidth

@@ -170,7 +170,11 @@ internal fun LiburuBookDetails(
     val pad = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp)
 
     // Liburuville: as in Fable, the cover stays put behind and the card slides up over it.
-    val sheetColor = MaterialTheme.colorScheme.background.takeIf { it.alpha > 0.99f } ?: MaterialTheme.colorScheme.surfaceContainerLow
+    // With a wallpaper, the card takes its light tone (pradera, océano…), so it changes with the theme.
+    val look by com.chmouel.liseur.ui.theme.LiburuAppearance.look.collectAsState()
+    val wall = com.chmouel.liseur.ui.theme.LiburuAppearance.wallpaper(look)?.takeIf { it.key != com.chmouel.liseur.ui.theme.LiburuAppearance.IMAGE }
+    val sheetColor = wall?.let { w -> if (w.dark) androidx.compose.ui.graphics.lerp(w.colors[1], Color.Black, 0.28f) else androidx.compose.ui.graphics.lerp(w.colors.first(), Color(0xFFFBF8F1), 0.55f) }
+        ?: MaterialTheme.colorScheme.background.takeIf { it.alpha > 0.99f } ?: MaterialTheme.colorScheme.surfaceContainerLow
     val density = androidx.compose.ui.platform.LocalDensity.current
     val overlap = with(density) { 28.dp.toPx() }
     var heroPx by remember { mutableStateOf(with(density) { 400.dp.toPx() }.toInt()) }
@@ -291,7 +295,7 @@ internal fun LiburuBookDetails(
                     net?.optJSONArray("byAuthor")?.takeIf { it.length() > 0 }?.let { arr ->
                         item(key = "byauthor") { ByAuthor(details.book.author.orEmpty(), arr, pad) }
                     }
-                    item(key = "where") { WhereToFind(details, pad) }
+                    item(key = "where") { WhereToFind(details, pad, sheetColor) }
                     item(key = "file") { DownloadLine(details, canDownload, download, onDownload, pad) }
                     item(key = "edit") {
                         Column(pad.padding(top = 16.dp)) {
@@ -1035,13 +1039,32 @@ private val APP_PKGS = listOf(
     "ivoox.com" to "com.ivoox.app", "youtube.com" to "com.google.android.youtube",
 )
 
-internal fun openUrl(context: android.content.Context, url: String) {
+/** Liburuville: the installed app whose launcher name is [label] («Fable», «Margins»…), if any. */
+internal fun appByLabel(context: android.content.Context, label: String): String? = runCatching {
+    val pm = context.packageManager
+    val launcher = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+    val want = label.lowercase()
+    pm.queryIntentActivities(launcher, 0).firstOrNull { r ->
+        val l = r.loadLabel(pm).toString().lowercase()
+        l == want || l.startsWith("$want ") || l.startsWith("$want:")
+    }?.activityInfo?.packageName
+}.getOrNull()
+
+internal fun openUrl(context: android.content.Context, url: String, appLabel: String? = null) {
     val uri = android.net.Uri.parse(url)
     val view = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-    // Apps that do not claim their own links (Babelio, Fable…) are asked by name, as the web does.
+    // Apps that do not claim their own links (Babelio, Fable, Margins…): the link in the app if it
+    // takes it, otherwise the app itself, never the browser while the app is installed.
     val host = uri.host.orEmpty().lowercase()
-    APP_PKGS.firstOrNull { (h, _) -> host == h || host.endsWith(".$h") }?.second?.let { pkg ->
-        if (runCatching { context.startActivity(android.content.Intent(view).setPackage(pkg)) }.isSuccess) return
+    val pm = context.packageManager
+    val pkg = appLabel?.let { appByLabel(context, it) }
+        ?: APP_PKGS.firstOrNull { (h, _) -> host == h || host.endsWith(".$h") }?.second?.takeIf { pm.getLaunchIntentForPackage(it) != null }
+    if (pkg != null) {
+        val inApp = android.content.Intent(view).setPackage(pkg)
+        if (pm.resolveActivity(inApp, 0) != null && runCatching { context.startActivity(inApp) }.isSuccess) return
+        pm.getLaunchIntentForPackage(pkg)?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)?.let { launch ->
+            if (runCatching { context.startActivity(launch) }.isSuccess) return
+        }
     }
     if (android.os.Build.VERSION.SDK_INT >= 30) {
         val app = android.content.Intent(view).addFlags(android.content.Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER)
@@ -1091,8 +1114,9 @@ private fun ByAuthor(author: String, arr: org.json.JSONArray, modifier: Modifier
 
 /** «Dónde encontrarlo»: the web's searches, by kind. */
 @Composable
-private fun WhereToFind(details: BookDetails, modifier: Modifier) {
+private fun WhereToFind(details: BookDetails, modifier: Modifier, sheet: Color = MaterialTheme.colorScheme.surfaceContainerLow) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val t = details.book.displayTitle
     val a = details.book.author.orEmpty()
     val enc = { x: String -> java.net.URLEncoder.encode(x, "UTF-8") }
@@ -1111,8 +1135,10 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
             "Fable" to "https://fable.co/search?q=$q",
             "Goodreads" to (isbn?.let { "https://www.goodreads.com/book/isbn/$it" } ?: "https://www.goodreads.com/search?q=$q"),
             "Hardcover" to "https://hardcover.app/search?q=$q",
-            "Lecturalia" to "https://www.lecturalia.com/buscar?q=$q",
-            "Qué libro leo" to "https://quelibroleo.com/buscar?q=$q",
+            // Neither has a search link: Lecturalia searches in a pop-up and Qué libro leo by form,
+            // so the first result for the book on each site, through DuckDuckGo's «\\» (feeling ducky).
+            "Lecturalia" to "https://duckduckgo.com/?q=${enc("\\$t $a site:lecturalia.com/libro")}",
+            "Qué libro leo" to "qll:" + slugOf(t),
         ),
         R.string.liburu_wf_podcasts to (
             listOf("Spotify · Libro" to "https://open.spotify.com/search/${enc("$t $a".trim())}/episodes", "iVoox · Libro" to ivoox(t)) +
@@ -1148,7 +1174,22 @@ private fun WhereToFind(details: BookDetails, modifier: Modifier) {
                 )
             }
             androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(links.size) { i -> val (name, url) = links[i]; WhereCard(name, url) { openUrl(context, url) } }
+                items(links.size) { i ->
+                    val (name, url) = links[i]
+                    WhereCard(name, url, sheet) {
+                        val platform = name.substringBefore(" · ")
+                        if (url.startsWith("qll:")) scope.launch {
+                            // Qué libro leo keeps each book at its title's slug; a miss goes to a search.
+                            val direct = "https://quelibroleo.com/" + url.removePrefix("qll:")
+                            val ok = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    okhttp3.OkHttpClient().newCall(okhttp3.Request.Builder().url(direct).header("User-Agent", "Mozilla/5.0 (Android)").build()).execute().use { it.code == 200 }
+                                }.getOrDefault(false)
+                            }
+                            openUrl(context, if (ok) direct else "https://duckduckgo.com/?q=" + enc("\\$t $a site:quelibroleo.com"))
+                        } else openUrl(context, url, platform)
+                    }
+                }
             }
         }
     }
@@ -1356,11 +1397,13 @@ private fun AllReviewsDialog(reviews: List<JSONObject>, total: Int, onClose: () 
  * is chosen, and the platform's name with «Libro» or «Autor» when the link is about one of them.
  */
 @Composable
-private fun WhereCard(name: String, url: String, onClick: () -> Unit) {
+private fun WhereCard(name: String, url: String, sheet: Color, onClick: () -> Unit) {
     val platform = name.substringBefore(" · ")
     val about = name.substringAfter(" · ", "").takeIf { it.isNotBlank() }
-    val host = runCatching { java.net.URI(url).host?.removePrefix("www.")?.removePrefix("open.") }.getOrNull().orEmpty()
-    val card = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 1f)
+    val host = if (url.startsWith("qll:")) "quelibroleo.com" else if (platform == "Lecturalia") "lecturalia.com"
+        else runCatching { java.net.URI(url).host?.removePrefix("www.")?.removePrefix("open.") }.getOrNull().orEmpty()
+    // The card is the sheet a shade lighter, so it changes with the chosen background.
+    val card = androidx.compose.ui.graphics.lerp(sheet.copy(alpha = 1f), Color.White, if (sheet.luminance() < 0.3f) 0.08f else 0.45f)
     val ink = MaterialTheme.colorScheme.primary
     val duotone = remember(card, ink) {
         val l = floatArrayOf(0.299f, 0.587f, 0.114f)
@@ -1377,10 +1420,13 @@ private fun WhereCard(name: String, url: String, onClick: () -> Unit) {
         modifier = Modifier.width(112.dp),
     ) {
         Column(Modifier.padding(vertical = 14.dp, horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(ink.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-                Text(platform.take(1), style = MaterialTheme.typography.titleLarge, color = ink)
+            var loaded by remember(host) { mutableStateOf(false) }
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(if (loaded) Color.Transparent else ink.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+                // The initial only while the icon loads: it would show through a transparent logo.
+                if (!loaded) Text(platform.take(1), style = MaterialTheme.typography.titleLarge, color = ink)
                 if (host.isNotBlank()) coil3.compose.AsyncImage(
                     model = "https://www.google.com/s2/favicons?domain=$host&sz=128",
+                    onSuccess = { loaded = true },
                     contentDescription = null,
                     colorFilter = duotone,
                     contentScale = androidx.compose.ui.layout.ContentScale.Fit,
@@ -1398,3 +1444,9 @@ private fun WhereCard(name: String, url: String, onClick: () -> Unit) {
         }
     }
 }
+
+
+/** Liburuville: a title as the slug sites like Qué libro leo use («Adiós a Berlín» → adios-a-berlin). */
+internal fun slugOf(title: String): String =
+    java.text.Normalizer.normalize(title.split(Regex("[:(\\[]"))[0].lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}"), "").replace(Regex("[^a-z0-9]+"), "-").trim('-')

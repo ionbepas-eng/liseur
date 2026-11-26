@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -90,7 +91,9 @@ import java.util.Locale
 private val ES = Locale("es", "ES")
 private val Gold = Color(0xFFE8B83A)
 /** The web's paper white: cards, tracks and day cells, whatever the theme's surface is. */
-private val Paper = Color(0xFFFFFBF8)
+// Liburuville: the light paper on a light theme, a dark one on a dark wallpaper.
+private val Paper: Color
+    @Composable get() = if (MaterialTheme.colorScheme.onSurface.luminance() > 0.5f) Color(0xFF2B2824) else Color(0xFFFFFBF8)
 
 /** One reading session, Android's or the web's, the way the web counts them. */
 private data class Sit(val key: String, val start: Long, val seconds: Double, val from: Double?, val to: Double?, val pages: Double?, val device: String = "android-here")
@@ -417,8 +420,8 @@ private fun streaks(days: Set<LocalDate>, today: LocalDate): Pair<Int, Int> {
 private fun Card(title: String? = null, sub: String? = null, content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = Color.White.copy(alpha = 0.5f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.55f)),
+        color = com.chmouel.liseur.ui.theme.liburuGlass(0.5f),
+        border = BorderStroke(1.dp, com.chmouel.liseur.ui.theme.liburuGlass(0.55f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -641,7 +644,7 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.OutlinedButton(
             onClick = { adding = LocalDate.now(zone) },
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)),
-            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = 0.6f), contentColor = MaterialTheme.colorScheme.onSurface),
+            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(containerColor = com.chmouel.liseur.ui.theme.liburuGlass(0.6f), contentColor = MaterialTheme.colorScheme.onSurface),
             modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth().height(44.dp),
         ) {
             Text("＋ Agregar sesión", style = MaterialTheme.typography.labelLarge)

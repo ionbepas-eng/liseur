@@ -3,6 +3,7 @@ package com.chmouel.liseur.ui.theme
 import android.content.Context
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,8 @@ object LiburuAppearance {
         "noche" to Color(0xFF121417),
     )
     val accents: List<Pair<String, Color>> = listOf(
+        // Liburuville: «Automático» takes its accent from the wallpaper, as Material You does.
+        AUTO to Color(0xFF8A7F86),
         "rosa" to Color(0xFFB23A6E),
         "terracota" to Color(0xFFA6491F),
         "azul" to Color(0xFF2E5E9E),
@@ -111,7 +114,36 @@ object LiburuAppearance {
     }
 
     fun backgroundColor(look: LiburuLook): Color? = backgrounds.firstOrNull { it.first == look.background }?.second
-    fun accentColor(look: LiburuLook): Color = accents.firstOrNull { it.first == look.accent }?.second ?: accents[0].second
+    const val AUTO = "auto"
+
+    /** The colour the theme is built around: the wallpaper's heart, or a tinted background. */
+    private fun sourceColor(look: LiburuLook): Color? =
+        wallpaper(look)?.takeIf { it.key != IMAGE }?.colors?.let { it[it.size / 2] }
+            ?: backgroundColor(look)
+
+    private fun hsl(c: Color): FloatArray = FloatArray(3).also { androidx.core.graphics.ColorUtils.colorToHSL(c.toArgb(), it) }
+    private fun fromHsl(h: Float, s: Float, l: Float): Color = Color(androidx.core.graphics.ColorUtils.HSLToColor(floatArrayOf(((h % 360f) + 360f) % 360f, s.coerceIn(0f, 1f), l.coerceIn(0f, 1f))))
+
+    /**
+     * The accent in force. Like Material You's harmonising: a chosen accent turns part of the way
+     * toward the wallpaper's hue, so pink on an ocean leans plum, green on a sunset leans olive.
+     * «Automático» is the wallpaper's own hue, deepened to a readable ink.
+     */
+    fun accentColor(look: LiburuLook): Color {
+        val chosen = accents.firstOrNull { it.first == look.accent && it.first != AUTO }?.second
+        val src = sourceColor(look)?.let(::hsl)?.takeIf { it[1] > 0.10f }
+        if (chosen == null) {
+            // Automático: no colourful source leaves the house pink.
+            return src?.let { fromHsl(it[0], maxOf(it[1], 0.45f).coerceAtMost(0.62f), 0.38f) } ?: accents[1].second
+        }
+        if (src == null || look.accent == "tinta") return chosen
+        val a = hsl(chosen)
+        var diff = src[0] - a[0]
+        if (diff > 180f) diff -= 360f
+        if (diff < -180f) diff += 360f
+        val turn = (diff * 0.35f).coerceIn(-40f, 40f)
+        return fromHsl(a[0] + turn, a[1], a[2])
+    }
 
     /** Whether the chosen background asks for a dark scheme; null leaves it to the theme mode. */
     fun forcesDark(look: LiburuLook): Boolean? =

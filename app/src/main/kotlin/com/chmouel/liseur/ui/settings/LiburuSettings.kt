@@ -119,8 +119,9 @@ internal fun LiburuSettings(onOpenReadAloud: () -> Unit = {}) {
                 modifier = Modifier.padding(top = 8.dp),
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LiburuAppearance.accents.forEach { (key, color) ->
-                    Swatch(color, swatchName(key), look.accent == key) { LiburuAppearance.setAccent(key) }
+                LiburuAppearance.accents.forEach { (key, _) ->
+                    // Each swatch as it will look on this background (harmonised, or the wallpaper's own for Automático).
+                    Swatch(LiburuAppearance.accentColor(look.copy(accent = key)), swatchName(key), look.accent == key) { LiburuAppearance.setAccent(key) }
                 }
             }
             // Liburuville: Home's layout on a tablet or a phone held sideways (≥ 600 dp).
@@ -396,6 +397,7 @@ private fun swatchName(key: String): String = stringResource(
         "pradera" -> R.string.liburu_w_pradera
         "bosque" -> R.string.liburu_w_bosque
         "medianoche" -> R.string.liburu_w_medianoche
+        "auto" -> R.string.liburu_c_auto
         else -> R.string.liburu_c_tinta
     },
 )

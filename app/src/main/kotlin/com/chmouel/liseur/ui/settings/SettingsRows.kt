@@ -79,7 +79,7 @@ internal fun SettingsGroup(
     // As the web's settings: each section a cream card, its name in Fraunces inside it.
     androidx.compose.material3.Surface(
         shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-        color = com.chmouel.liseur.ui.theme.liburuGlass(0.55f),
+        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
     ) {

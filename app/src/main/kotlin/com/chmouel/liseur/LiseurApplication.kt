@@ -40,6 +40,7 @@ class LiseurApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        LiburuCrash.install(this)
         com.chmouel.liseur.data.gdrive.DriveAuth.init(this)
         com.chmouel.liseur.ui.library.LiburuComics.init(this)
         com.chmouel.liseur.audio.LiburuAudiobooks.init(this)

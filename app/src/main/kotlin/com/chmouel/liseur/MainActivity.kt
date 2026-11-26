@@ -183,6 +183,7 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         splash.setKeepOnScreenCondition { deciding || launchModel.resolving.value }
         super.onCreate(savedInstanceState)
+        window.decorView.post { LiburuCrash.offer(this) }
         enableEdgeToEdge()
         if (savedInstanceState == null) acceptShortcut(intent)
         // Restore an unfinished shortcut before deciding whether ordinary startup may resume.

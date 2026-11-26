@@ -29,11 +29,6 @@
         feature silently falls back to the browser every time.
     -->
     <queries>
-        <!-- Liburuville: find reading apps (Fable, Margins, Babelio…) installed, to open them instead of their web. -->
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>

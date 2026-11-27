@@ -26,6 +26,14 @@ object QuoteShare {
     fun share(context: Context, quote: HomeQuote) {
         val text = quote.text.trim().trim('"', '“', '”', '«', '»')
         val credit = listOfNotNull(quote.book.title, quote.book.author).joinToString(" · ")
+        // Liburuville: the story sheet (colour, sticker, Instagram) takes over.
+        com.chmouel.liseur.ui.share.StoryShare.open(
+            com.chmouel.liseur.ui.share.StoryContent(
+                kicker = "de mis lecturas", title = quote.book.title, sub = quote.book.author,
+                quote = text, text = "«$text»\n— $credit",
+            ),
+        )
+        if (true) return
         val file = runCatching { render(context, text, credit) }.getOrNull()
         val intent = Intent(Intent.ACTION_SEND).apply {
             putExtra(Intent.EXTRA_TEXT, "«$text»\n— $credit")

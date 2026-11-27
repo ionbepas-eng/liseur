@@ -355,6 +355,28 @@ internal fun LiburuBookDetails(
         TopButtons(
             details, scrolled, onBack,
             actions = listOf(
+                R.string.liburu_bd_share_story to {
+                    val st = statusOf(details)
+                    val today = java.time.LocalDate.now()
+                    val zone = java.time.ZoneId.systemDefault()
+                    val minToday = sessions.filter { java.time.Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() == today }.sumOf { it.durationMs } / 60_000
+                    val pct = ((details.progression ?: 0.0) * 100).toInt()
+                    val rating = details.evaluations.find { it.field == PersonalEvaluation.RATING }?.value?.toIntOrNull()?.let { (it + 1) / 2 } ?: 0
+                    val days = sessions.map { java.time.Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() }.toSet().size
+                    val hours = sessions.sumOf { it.durationMs } / 60_000
+                    com.chmouel.liseur.ui.share.StoryShare.open(
+                        if (st == Status.FINISHED) com.chmouel.liseur.ui.share.StoryContent(
+                            kicker = "recién terminado", title = book.displayTitle, sub = book.author,
+                            line = listOfNotNull(if (rating > 0) "★".repeat(rating) + "☆".repeat(5 - rating) else null, if (days > 0) "$days días" else null, if (hours > 0) "${hours / 60} h ${hours % 60} min" else null).joinToString(" · "),
+                            coverPaths = listOfNotNull(book.coverPath), text = "He terminado «${book.displayTitle}»",
+                        ) else com.chmouel.liseur.ui.share.StoryContent(
+                            kicker = "leyendo hoy", title = book.displayTitle, sub = book.author,
+                            progress = (details.progression ?: 0.0).toFloat(),
+                            line = "$pct %" + if (minToday > 0) " · $minToday min hoy" else "",
+                            coverPaths = listOfNotNull(book.coverPath), text = "Leyendo «${book.displayTitle}»",
+                        ),
+                    )
+                },
                 R.string.liburu_bd_find_synopsis_net to refresh,
                 R.string.liburu_bd_write_synopsis_long to { editing = true },
                 R.string.liburu_bd_edit to { editing = true },

@@ -128,7 +128,7 @@ object LiburuPrefs {
 }
 
 /** What the sessions say about this week and the run of days read. */
-private data class Rhythm(val minutesToday: Int, val week: List<Boolean>, val streak: Int, val record: Int)
+private data class Rhythm(val minutesToday: Int, val week: List<Boolean>, val streak: Int, val record: Int, val protectors: Int = 0)
 
 private fun rhythmOf(sessions: List<ReadingSession>, today: LocalDate, zone: ZoneId): Rhythm {
     // Same rule as the statistics: a sitting counts on the day it ended.
@@ -139,18 +139,8 @@ private fun rhythmOf(sessions: List<ReadingSession>, today: LocalDate, zone: Zon
     val read = byDay.keys
     val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
     val week = (0..6).map { read.contains(monday.plusDays(it.toLong())) }
-    var streak = 0
-    var day = if (read.contains(today)) today else today.minusDays(1)
-    while (read.contains(day)) { streak++; day = day.minusDays(1) }
-    var record = 0
-    var run = 0
-    var prev: LocalDate? = null
-    for (d in read.sorted()) {
-        run = if (prev != null && prev.plusDays(1) == d) run + 1 else 1
-        record = maxOf(record, run)
-        prev = d
-    }
-    return Rhythm(((byDay[today] ?: 0L) / 60_000).toInt(), week, streak, maxOf(record, streak))
+    val run = com.chmouel.liseur.ui.share.LiburuStreak.of(read, today)
+    return Rhythm(((byDay[today] ?: 0L) / 60_000).toInt(), week, run.current, run.record, run.protectors)
 }
 
 /** The next unread books worth starting: the next volume of a series under way first. */
@@ -319,6 +309,7 @@ internal fun LiburuHome(
                 modifier = gutter.fillMaxWidth(),
             )
         }
+        item(key = "lh:missions") { MissionsCard(allSessions, gutter.fillMaxWidth()) }
         progress?.let { p ->
             item(key = "lh:level") { LevelCard(p.level, gutter.fillMaxWidth()) }
             if (p.retos.isNotEmpty()) {
@@ -337,6 +328,7 @@ internal fun LiburuHome(
             item(key = "lh:dash") {
                 LiburuHomeDash(layout, rhythm, goal, reading.firstOrNull(), locale, onRead, progress, gutter.fillMaxWidth())
             }
+            item(key = "lh:missions2") { MissionsCard(allSessions, gutter.fillMaxWidth()) }
         }
         if (readThisYear.isNotEmpty()) {
             item(key = "lh:year") {
@@ -517,6 +509,21 @@ private fun GoalsCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (rhythm.protectors > 0) Text(
+                "🛡 " + (if (rhythm.protectors == 1) "1 protector de racha" else "${rhythm.protectors} protectores de racha") + ": un día sin leer no la rompe",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            if (rhythm.streak > 0) androidx.compose.material3.TextButton(onClick = {
+                com.chmouel.liseur.ui.share.StoryShare.open(
+                    com.chmouel.liseur.ui.share.StoryContent(
+                        kicker = "mi racha lectora", big = "${rhythm.streak}",
+                        title = if (rhythm.streak == 1) "día leyendo" else "días seguidos leyendo",
+                        sub = "récord ${rhythm.record}", line = listOf("L", "M", "X", "J", "V", "S", "D").mapIndexed { i, d -> if (rhythm.week.getOrElse(i) { false }) "●" else d }.joinToString("  "),
+                        text = "${rhythm.streak} días seguidos leyendo",
+                    ),
+                )
+            }) { Text("Compartir racha") }
         }
         }
     }
@@ -778,6 +785,55 @@ private fun RetosCompact(p: LiburuProgress.Summary, modifier: Modifier, inRow: B
             }
             if (inRow) Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { p.retos.forEach { one(it, Modifier.weight(1f)) } }
             else p.retos.forEach { one(it, Modifier.fillMaxWidth()) }
+        }
+    }
+}
+
+
+/** Liburuville: the day's three missions, ticked off as the reading happens. */
+@Composable
+private fun MissionsCard(sessions: List<ReadingSession>, modifier: Modifier) {
+    val context = LocalContext.current
+    val zone = remember { ZoneId.systemDefault() }
+    val today = LocalDate.now(zone)
+    val marks by remember { (context.applicationContext as LiseurApplication).container.database.annotationDao().observeAllMarks() }.collectAsState(initial = emptyList())
+    val state = remember(sessions, marks, today) {
+        val todays = sessions.filter { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() == today && it.durationMs > 0 }
+        val hours = todays.map { Instant.ofEpochMilli(it.startedAt).atZone(zone).hour }
+        com.chmouel.liseur.ui.share.LiburuMissions.State(
+            minutes = (todays.sumOf { it.durationMs } / 60_000).toInt(),
+            sessions = todays.size,
+            marks = marks.count { Instant.ofEpochMilli(it.createdAt).atZone(zone).toLocalDate() == today },
+            early = hours.any { it < 9 }, late = hours.any { it >= 22 },
+            advance = todays.groupBy { it.bookUrl }.values.maxOfOrNull { l -> l.sumOf { s -> ((s.endProgression ?: 0.0) - (s.startProgression ?: 0.0)).coerceAtLeast(0.0) } } ?: 0.0,
+        )
+    }
+    val missions = remember(today) { com.chmouel.liseur.ui.share.LiburuMissions.today(today) }
+    LaunchedEffect(state) {
+        val done = missions.filter { it.value(state) >= it.target }.map { it.id }.toSet()
+        com.chmouel.liseur.ui.share.LiburuMissions.record(context, today, done)
+    }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(28.dp), modifier = modifier) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Misiones de hoy", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+                Text("+${com.chmouel.liseur.ui.share.LiburuMissions.XP} pts cada una", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            missions.forEach { m ->
+                val v = m.value(state)
+                val ok = v >= m.target
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(28.dp).background(if (ok) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = if (ok) 1f else 0.4f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { if (ok) Text("✓", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge) }
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(m.title, style = MaterialTheme.typography.bodyLarge, color = if (ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                        if (!ok && m.target > 1) ProgressBar((v / m.target).toFloat(), MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
         }
     }
 }

@@ -2303,4 +2303,5 @@
     <string name="liburu_translation_mymemory">MyMemory (gratis, sin cuenta)</string>
     <string name="liburu_translation_mymemory_summary">Traduce las frases que selecciones con MyMemory, el traductor gratuito de la web.</string>
     <string name="liburu_c_auto">Automático</string>
+    <string name="liburu_bd_share_story">Compartir en Instagram</string>
 </resources>

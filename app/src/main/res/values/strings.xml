@@ -2377,4 +2377,5 @@
     <string name="liburu_translation_mymemory">MyMemory (free, no account)</string>
     <string name="liburu_translation_mymemory_summary">Translates selected passages with MyMemory, the web app\'s free translator.</string>
     <string name="liburu_c_auto">Automatic</string>
+    <string name="liburu_bd_share_story">Share on Instagram</string>
 </resources>

@@ -78,7 +78,7 @@ object LiburuProgress {
         sits.forEach { pagesByBook[it.key] = (pagesByBook[it.key] ?: 0.0) + sitPages(it) }
         finishedAt.keys.forEach { pagesByBook[it] = maxOf(pagesByBook[it] ?: 0.0, pagesOf(it)) }
         val tiers = state.optJSONObject("achv")?.let { a -> a.keys().asSequence().sumOf { a.optJSONObject(it)?.optInt("tier") ?: 0 } } ?: 0
-        val xp = pagesByBook.values.sum() + 100.0 * finishedAt.size + 50.0 * tiers
+        val xp = pagesByBook.values.sum() + 100.0 * finishedAt.size + 50.0 * tiers + com.chmouel.liseur.ui.share.LiburuMissions.xp()
 
         // Shelves whose name says "clásico".
         val shelves = state.optJSONObject("shelves") ?: JSONObject()

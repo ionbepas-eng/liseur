@@ -404,7 +404,11 @@ fun LiburuStatsScreen(
     }
 }
 
-private fun streaks(days: Set<LocalDate>, today: LocalDate): Pair<Int, Int> {
+private fun streaks(days: Set<LocalDate>, today: LocalDate): Pair<Int, Int> =
+    com.chmouel.liseur.ui.share.LiburuStreak.of(days, today).let { it.current to it.record }
+
+@Suppress("unused")
+private fun streaksStrict(days: Set<LocalDate>, today: LocalDate): Pair<Int, Int> {
     var cur = 0
     var d = if (today in days) today else today.minusDays(1)
     while (d in days) { cur++; d = d.minusDays(1) }
@@ -649,6 +653,18 @@ private fun MonthCard(data: StatsData, ym: YearMonth, zone: ZoneId, onOpen: (Boo
         ) {
             Text("＋ Agregar sesión", style = MaterialTheme.typography.labelLarge)
         } }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TextButton(onClick = {
+            val fin = data.finishedAt.filter { it.value in from until to }.keys.mapNotNull { data.byKey[it] }
+            val mins = (ms.sumOf { it.seconds } / 60).toInt()
+            val name = ym.month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, ES)
+            com.chmouel.liseur.ui.share.StoryShare.open(
+                com.chmouel.liseur.ui.share.StoryContent(
+                    kicker = "mi $name lector", title = "$done ${if (done == 1) "libro" else "libros"} · ${mins / 60} h",
+                    sub = "${fmtNum(pages)} páginas · ${byDay.size} días leyendo",
+                    coverPaths = fin.mapNotNull { it.coverPath }.take(4), text = "Mi $name en Liburuville",
+                ),
+            )
+        }) { Text("Compartir el mes") } }
     }
     adding?.let { d -> AddSessionDialog(data.books, d, zone) { adding = null } }
     dayOpen?.let { day ->
@@ -749,6 +765,8 @@ private val ACHIEVEMENTS = listOf(
     Achv("perfect", "Mes perfecto", "📅", listOf(1)) { "Lee todos los días de un mes" },
     Achv("devices", "Nómada", "📱", listOf(3)) { "Lee en 3 dispositivos distintos" },
     Achv("retos", "Retador", "🚩", listOf(1, 6, 12)) { "Completa $it ${if (it == 1) "reto" else "retos"}" },
+    Achv("lang", "Políglota", "🗣", listOf(2, 3, 5)) { "Termina libros en $it idiomas distintos" },
+    Achv("decades", "Viajero en el tiempo", "🕰", listOf(3, 5, 8)) { "Termina libros escritos en $it décadas distintas" },
 )
 private val TIER_NAMES = listOf("Bronce", "Plata", "Oro", "Rubí", "Diamante")
 private val TIER_COLORS = listOf(Color(0xFFD98B5B), Color(0xFF9FB4C7), Color(0xFFE8B83A), Color(0xFFC8455F), Color(0xFF6C8FE0))
@@ -795,6 +813,8 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
             "words" to com.chmouel.liseur.data.gdrive.LiburuShared.vocab(context).size.toDouble(),
             "devices" to data.sits.map { it.device }.filter { it.isNotEmpty() }.toSet().size.toDouble(),
             "retos" to 0.0,
+            "lang" to fin.mapNotNull { lang(it)?.take(2)?.takeIf { l -> l.length == 2 } }.toSet().size.toDouble(),
+            "decades" to fin.mapNotNull { data.year(it)?.let { y -> y / 10 } }.toSet().size.toDouble(),
         )
         ACHIEVEMENTS.associate { a -> a.id to maxOf(local[a.id] ?: 0.0, web(a.id)) }
     }
@@ -858,6 +878,7 @@ private fun Achievements(data: StatsData, zone: ZoneId) {
                 }
             },
             confirmButton = { TextButton(onClick = { open = null }) { Text("Cerrar") } },
+            dismissButton = if (tier > 0) ({ TextButton(onClick = { shareBadge(a, tier); open = null }) { Text("Compartir") } }) else null,
         )
     }
 }
@@ -1188,7 +1209,7 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
     val retos = calc.list
     fun progress(r: Reto) = calc.progress(r)
     val tiers = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
-    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50
+    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50 + com.chmouel.liseur.ui.share.LiburuMissions.xp()
     val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
     val next = LEVELS.getOrNull(li + 1)
     val pct = next?.let { ((xp - LEVELS[li].first) / (it.first - LEVELS[li].first)).toFloat() } ?: 1f
@@ -1258,6 +1279,13 @@ private fun LogrosPage(data: StatsData, zone: ZoneId, values: Map<String, Double
 }
 
 
+private fun shareBadge(a: Achv, tier: Int) = com.chmouel.liseur.ui.share.StoryShare.open(
+    com.chmouel.liseur.ui.share.StoryContent(
+        kicker = "nueva insignia", title = badgeTitle(a, tier), sub = a.desc(a.tiers[(tier - 1).coerceAtLeast(0)]),
+        badgeAsset = "badges/${a.id}_${tier.coerceIn(0, a.tiers.size)}.webp", text = "Nueva insignia en Liburuville: ${badgeTitle(a, tier)}",
+    ),
+)
+
 private fun badgeTitle(a: Achv, tier: Int) = if (tier > 0 && a.tiers.size > 1) "${a.name} · ${TIER_NAMES[tier - 1]}" else a.name
 
 /** The web's medal for this badge at this tier, pre-drawn from its SVG. */
@@ -1272,7 +1300,7 @@ private fun Badge(a: Achv, tier: Int, size: Dp) {
 
 private fun levelOf(values: Map<String, Double>): Triple<Int, Double, Pair<Int, String>?> {
     val tiers = ACHIEVEMENTS.sumOf { a -> a.tiers.count { (values[a.id] ?: 0.0) >= it } }
-    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50
+    val xp = (values["pages"] ?: 0.0) + (values["books"] ?: 0.0) * 100 + tiers * 50 + com.chmouel.liseur.ui.share.LiburuMissions.xp()
     val li = LEVELS.indexOfLast { xp >= it.first }.coerceAtLeast(0)
     return Triple(li, xp, LEVELS.getOrNull(li + 1))
 }
@@ -1336,6 +1364,7 @@ private fun Celebrate(a: Achv, tier: Int, more: Int, onLogros: () -> Unit, onDon
                     if (more > 0) Text("y $more ${if (more == 1) "logro más" else "logros más"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                         androidx.compose.material3.OutlinedButton(onClick = onLogros) { Text("Ver logros") }
+                        androidx.compose.material3.OutlinedButton(onClick = { shareBadge(a, tier) }) { Text("Compartir") }
                         Button(onClick = onDone, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = Paper)) { Text("¡Genial!") }
                     }
                 }

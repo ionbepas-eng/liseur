@@ -220,6 +220,7 @@ class MainActivity : ComponentActivity() {
                         launch = resolution,
                         onLaunchHandled = launchModel::handled,
                     )
+                    com.chmouel.liseur.ui.share.StoryShareHost()
                 }
             }
         }

@@ -103,37 +103,43 @@ object StoryShare {
         return wall?.colors?.first() ?: LiburuAppearance.backgroundColor(look) ?: Color(0xFFF5F1E6)
     }
 
-    fun render(context: Context, c: StoryContent, paper: Color?, doodles: Boolean, sticker: Boolean): Bitmap {
-        val bg = paper ?: themeColor()
+    fun render(context: Context, c: StoryContent, paper: Color?, doodles: Boolean, sticker: Boolean, photo: Bitmap? = null): Bitmap {
+        // Strava-like overlay: no card, light ink with a soft shadow, over a photo or nothing at all.
+        val overlay = sticker || photo != null
+        val bg = if (overlay) Color(0xFF1B1A17) else paper ?: themeColor()
         val dark = bg.luminance() < 0.35f
-        val ink = if (dark) 0xFFF6F0E6.toInt() else 0xFF2A2724.toInt()
+        val ink = if (overlay) (paper ?: Color.White).toArgb() else if (dark) 0xFFF6F0E6.toInt() else 0xFF2A2724.toInt()
         val accentC = LiburuAppearance.accentColor(LiburuAppearance.look.value)
         val accent = (if (dark) androidx.compose.ui.graphics.lerp(accentC, Color.White, 0.55f) else accentC).toArgb()
         val serif = runCatching { Typeface.createFromAsset(context.assets, "fonts/Fraunces.ttf") }.getOrDefault(Typeface.SERIF)
         val sans = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
         val w = 1080
-        val h = if (sticker) 1200 else 1920
+        val h = if (sticker && photo == null) 1200 else 1920
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val cv = Canvas(bmp)
         val seed = (c.title.hashCode() and 0x7fffffff)
 
-        if (sticker) {
-            // A card that floats on whatever Instagram puts behind it.
-            val card = RectF(60f, 60f, w - 60f, h - 60f)
-            cv.drawRoundRect(RectF(card.left + 10, card.top + 18, card.right + 10, card.bottom + 18), 64f, 64f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33000000 })
-            cv.drawRoundRect(card, 64f, 64f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg.toArgb() })
-        } else {
+        if (photo != null) {
+            // The photo fills the story, cropped to its middle, with a veil top and bottom for the words.
+            val scale = maxOf(w.toFloat() / photo.width, h.toFloat() / photo.height)
+            val pw = photo.width * scale; val ph = photo.height * scale
+            cv.drawBitmap(photo, null, RectF((w - pw) / 2f, (h - ph) / 2f, (w + pw) / 2f, (h + ph) / 2f), Paint(Paint.FILTER_BITMAP_FLAG))
+            cv.drawRect(0f, 0f, w.toFloat(), h.toFloat(), Paint().apply {
+                shader = android.graphics.LinearGradient(0f, 0f, 0f, h.toFloat(), intArrayOf(0x66000000, 0x10000000, 0x22000000, 0x99000000.toInt()), floatArrayOf(0f, 0.3f, 0.55f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            })
+        } else if (!sticker) {
             cv.drawColor(bg.toArgb())
         }
         val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE; strokeWidth = 5f; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
             color = ink; alpha = 200
+            if (overlay) setShadowLayer(6f, 0f, 2f, 0x66000000)
         }
         // Quotes stand alone: colour and words, no doodles.
         if (doodles && c.quote == null) drawDoodles(cv, w, h, stroke, accent, seed, sticker)
 
         fun text(t: String, size: Float, face: Typeface, color: Int, y: Float, max: Int = 3, align: Layout.Alignment = Layout.Alignment.ALIGN_CENTER, margin: Int = 120, alpha: Int = 255): Float {
-            val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size; typeface = face; this.color = color; this.alpha = alpha }
+            val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size; typeface = face; this.color = color; this.alpha = alpha; if (overlay) setShadowLayer(10f, 0f, 3f, 0x88000000.toInt()) }
             val l = StaticLayout.Builder.obtain(t, 0, t.length, p, w - margin * 2).setAlignment(align)
                 .setLineSpacing(0f, 1.15f).setMaxLines(max).setEllipsize(TextUtils.TruncateAt.END).build()
             cv.save(); cv.translate(margin.toFloat(), y); l.draw(cv); cv.restore()
@@ -146,7 +152,7 @@ object StoryShare {
         if (c.quote != null) {
             val q = "«" + c.quote.trim().trim('«', '»', '"', '“', '”') + "»"
             val size = when { q.length < 120 -> 64f; q.length < 260 -> 52f; else -> 42f }
-            val qp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size; typeface = Typeface.create(serif, Typeface.ITALIC); color = ink }
+            val qp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size; typeface = Typeface.create(serif, Typeface.ITALIC); color = ink; if (overlay) setShadowLayer(10f, 0f, 3f, 0x88000000.toInt()) }
             val l = StaticLayout.Builder.obtain(q, 0, q.length, qp, w - 260).setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setLineSpacing(0f, 1.25f).setMaxLines(if (sticker) 9 else 14).setEllipsize(TextUtils.TruncateAt.END).build()
             val y0 = ((h - l.height) / 2f - 60f).coerceAtLeast(top + 120f)
@@ -201,8 +207,8 @@ object StoryShare {
             }
             if (c.line != null) text(c.line, 40f, sans, ink, y, 2, alpha = 210)
         }
-        val brand = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 34f; typeface = serif; color = ink; alpha = 150; textAlign = Paint.Align.CENTER }
-        cv.drawText("liburuville", w / 2f, h - (if (sticker) 110f else 130f), brand)
+        val brand = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 34f; typeface = serif; color = ink; alpha = 170; textAlign = Paint.Align.CENTER; if (overlay) setShadowLayer(8f, 0f, 2f, 0x88000000.toInt()) }
+        cv.drawText("liburuville", w / 2f, h - (if (sticker && photo == null) 70f else 130f), brand)
         return bmp
     }
 
@@ -282,12 +288,24 @@ object StoryShare {
         return FileProvider.getUriForFile(context, context.packageName + ".quotes", f)
     }
 
+    /** The transparent sticker into the gallery (Pictures/Liburuville), for Instagram's own sticker picker. */
+    fun saveToGallery(context: Context, bmp: Bitmap): Boolean = runCatching {
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "liburuville-${System.currentTimeMillis()}.png")
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+            if (android.os.Build.VERSION.SDK_INT >= 29) put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Liburuville")
+        }
+        val uri = context.contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+        context.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        true
+    }.getOrDefault(false)
+
     /** Straight into Instagram's story composer; the Android share sheet when Instagram is not there. */
-    fun toInstagram(context: Context, bmp: Bitmap, c: StoryContent, sticker: Boolean, paper: Color?) {
+    fun toInstagram(context: Context, bmp: Bitmap, c: StoryContent, sticker: Boolean, paper: Color?, composed: Boolean = false) {
         val uri = save(context, bmp)
         val ig = "com.instagram.android"
         val story = Intent("com.instagram.share.ADD_TO_STORY").apply {
-            if (sticker) {
+            if (sticker && !composed) {
                 type = "image/png"
                 putExtra("interactive_asset_uri", uri)
                 val bg = String.format("#%06X", 0xFFFFFF and (paper ?: Color(0xFFF3E9D8)).toArgb())
@@ -325,9 +343,16 @@ fun StoryShareHost() {
     var paperIx by remember(content) { mutableStateOf(0) }
     var doodles by remember(content) { mutableStateOf(true) }
     var sticker by remember(content) { mutableStateOf(false) }
+    var photoUri by remember(content) { mutableStateOf<android.net.Uri?>(null) }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) { photoUri = uri; sticker = true }
+    }
     val paper = StoryShare.palettes[paperIx].second
-    val bmp by produceState<Bitmap?>(null, content, paperIx, doodles, sticker) {
-        value = withContext(Dispatchers.Default) { runCatching { StoryShare.render(context, content, paper, doodles, sticker) }.getOrNull() }
+    val photo by produceState<Bitmap?>(null, photoUri) {
+        value = photoUri?.let { u -> withContext(Dispatchers.IO) { loadPhoto(context, u) } }
+    }
+    val bmp by produceState<Bitmap?>(null, content, paperIx, doodles, sticker, photo) {
+        value = withContext(Dispatchers.Default) { runCatching { StoryShare.render(context, content, paper, doodles, sticker, photo.takeIf { sticker }) }.getOrNull() }
     }
     ModalBottomSheet(
         onDismissRequest = { StoryShare.request.value = null },
@@ -341,7 +366,7 @@ fun StoryShareHost() {
                     Image(
                         it.asImageBitmap(), null,
                         Modifier.aspectRatio(it.width.toFloat() / it.height).clip(RoundedCornerShape(16.dp))
-                            .then(if (sticker) Modifier.background(Color(0xFFDDDDDD)) else Modifier),
+                            .then(if (sticker && photo == null) Modifier.background(Color(0xFF7A7672)) else Modifier),
                     )
                 }
             }
@@ -361,11 +386,21 @@ fun StoryShareHost() {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (content.quote == null) FilterChip(selected = doodles, onClick = { doodles = !doodles }, label = { Text("Garabatos") })
                 Text("Sin fondo (pegatina)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(start = 8.dp))
-                Switch(checked = sticker, onCheckedChange = { sticker = it })
+                Switch(checked = sticker, onCheckedChange = { sticker = it; if (!it) photoUri = null })
+            }
+            if (sticker) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = {
+                    pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }, modifier = Modifier.weight(1f)) { Text(if (photo == null) "Elegir foto de fondo" else "Cambiar foto") }
+                OutlinedButton(onClick = {
+                    val clean = runCatching { StoryShare.render(context, content, paper, doodles, true, null) }.getOrNull()
+                    val ok = clean != null && StoryShare.saveToGallery(context, clean)
+                    android.widget.Toast.makeText(context, if (ok) "Guardado en Imágenes › Liburuville" else "No se ha podido guardar", android.widget.Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.weight(1f)) { Text("Guardar sin fondo") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
-                    onClick = { bmp?.let { StoryShare.toInstagram(context, it, content, sticker, paper); StoryShare.request.value = null } },
+                    onClick = { bmp?.let { StoryShare.toInstagram(context, it, content, sticker, paper, composed = photo != null && sticker); StoryShare.request.value = null } },
                     modifier = Modifier.weight(1f),
                 ) { Text("Historia de Instagram") }
                 OutlinedButton(
@@ -376,3 +411,14 @@ fun StoryShareHost() {
         }
     }
 }
+
+
+private fun loadPhoto(context: Context, uri: android.net.Uri): Bitmap? = runCatching {
+    val cr = context.contentResolver
+    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, o) }
+    var s = 1
+    while (minOf(o.outWidth, o.outHeight) / (s * 2) >= 1080) s *= 2
+    val b = cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = s }) } ?: return null
+    com.chmouel.liseur.ui.theme.LiburuPhotos.upright(context, uri, b)
+}.getOrNull()

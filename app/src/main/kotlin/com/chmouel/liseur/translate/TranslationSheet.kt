@@ -138,7 +138,13 @@ internal fun TranslationSheet(
 
     val book = remember(declared) { TranslationLanguages.source(declared) }
     var pickedSource by rememberSaveable { mutableStateOf<String?>(null) }
-    val source = pickedSource ?: book
+    // Liburuville: a passage in another tongue than the book's («so ist die Sache!» in a Spanish
+    // novel) is recognised on the device, and that language is the starting point.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val detected by androidx.compose.runtime.produceState<String?>(null, passage) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { detectPassageLanguage(context, passage) }
+    }
+    val source = pickedSource ?: detected?.takeIf { d -> book == null || !TranslationLanguages.same(d, book) } ?: book
     val target = stored?.let { TranslationLanguages.target(it.tag, ui) }
     var picking by rememberSaveable { mutableStateOf<Picking?>(null) }
     // Null when closed; true opens it on the Services page.
@@ -726,3 +732,17 @@ internal fun LanguagePicker(
 private const val ORIGINAL_LINES = 3
 private const val FADE_MS = 220
 private const val PICKER_HEIGHT = 0.6f
+
+
+/** The passage's language by the system's text classifier (Android 10+), only when it is sure. */
+internal fun detectPassageLanguage(context: android.content.Context, passage: String): String? {
+    if (android.os.Build.VERSION.SDK_INT < 29 || passage.isBlank()) return null
+    return runCatching {
+        val tc = context.getSystemService(android.view.textclassifier.TextClassificationManager::class.java)?.textClassifier ?: return null
+        val result = tc.detectLanguage(android.view.textclassifier.TextLanguage.Request.Builder(passage).build())
+        if (result.localeHypothesisCount == 0) return null
+        val locale = result.getLocale(0)
+        val sure = result.getConfidenceScore(locale) >= if (passage.length < 40) 0.85f else 0.7f
+        if (sure) TranslationLanguages.of(locale.toLanguageTag()) else null
+    }.getOrNull()
+}

@@ -177,9 +177,15 @@ object DriveAuth {
         return token
     }
 
+    /** Liburuville: the HTTP code of the last refused renewal (400 invalid_grant: the sign-in expired), or 0. */
+    @Volatile var lastTokenRefusal = 0
+        private set
+
     private fun token(body: FormBody): JSONObject {
         http.newCall(Request.Builder().url(TOKEN_URL).post(body).build()).execute().use { response ->
             val text = response.body.string()
+            lastTokenRefusal = if (response.isSuccessful) 0 else response.code
+            if (!response.isSuccessful) android.util.Log.w("DriveAuth", "token ${response.code}: $text")
             if (!response.isSuccessful) throw IOException("token ${response.code}: $text")
             return JSONObject(text)
         }

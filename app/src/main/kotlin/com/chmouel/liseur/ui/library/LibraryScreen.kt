@@ -2569,17 +2569,6 @@ internal fun BookCard(
                 FinishedBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
             }
             if (selecting) LiburuSelectionMark(book.url in chosen, Modifier.align(Alignment.TopEnd).padding(6.dp))
-            if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(book.url)) {
-                androidx.compose.material3.Surface(
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    color = androidx.compose.ui.graphics.Color(0xCC1F1A14),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(26.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(androidx.compose.material.icons.Icons.Outlined.Headphones, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(15.dp))
-                    }
-                }
-            }
             // Only a search shows an archived book among others, and
             // the corner left free by the rest says so.
             if (book.archived && progress == null) {
@@ -2938,6 +2927,67 @@ internal fun PlaceholderCover(book: Book, modifier: Modifier = Modifier) {
 
 @Composable
 fun BookCover(book: Book, modifier: Modifier = Modifier, shape: Shape = LiburuCoverShape) {
+    // Liburuville: an audiobook is a CD in its jewel case, square and sitting at the foot of the
+    // book-shaped slot, as on the web.
+    if (com.chmouel.liseur.audio.LiburuAudiobooks.isAudio(book.url) && !LocalEInk.current) {
+        Box(modifier, contentAlignment = Alignment.BottomCenter) {
+            val cd = RoundedCornerShape(4.dp)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .shadow(6.dp, cd, ambientColor = Color.Black.copy(alpha = 0.3f), spotColor = Color.Black.copy(alpha = 0.4f))
+                    .clip(cd)
+                    .background(Color(0xFF111111)),
+            ) {
+                val artwork = book.coverPath ?: book.coverUrl
+                if (artwork != null) {
+                    SubcomposeAsyncImage(
+                        model = artwork,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                        error = { PlaceholderCover(book) },
+                        loading = { PlaceholderCover(book) },
+                    )
+                } else PlaceholderCover(book)
+                // The hinge of the case and the gloss of its lid.
+                Box(
+                    Modifier.matchParentSize().drawWithContent {
+                        val hinge = size.width * 0.07f
+                        drawRect(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                0f to Color.Black.copy(alpha = 0.45f),
+                                0.6f to Color.White.copy(alpha = 0.18f),
+                                1f to Color.Black.copy(alpha = 0.25f),
+                                startX = 0f, endX = hinge,
+                            ),
+                            size = androidx.compose.ui.geometry.Size(hinge, size.height),
+                        )
+                        drawLine(Color.White.copy(alpha = 0.25f), androidx.compose.ui.geometry.Offset(hinge, 0f), androidx.compose.ui.geometry.Offset(hinge, size.height), 1.5f)
+                        drawRect(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                0f to Color.White.copy(alpha = 0.28f),
+                                0.32f to Color.White.copy(alpha = 0.06f),
+                                0.5f to Color.Transparent,
+                                0.8f to Color.White.copy(alpha = 0.08f),
+                                1f to Color.Transparent,
+                                start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                end = androidx.compose.ui.geometry.Offset(size.width, size.height * 1.4f),
+                            ),
+                        )
+                    },
+                )
+                Box(
+                    Modifier.align(Alignment.BottomEnd).padding(6.dp).size(24.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.Black.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(androidx.compose.material.icons.Icons.Outlined.Headphones, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
+            }
+        }
+        return
+    }
     val artwork = book.coverPath ?: book.coverUrl
     val eInkCover = LocalEInk.current
     // Liburuville: the web's printed-book look, a spine fold on the left,

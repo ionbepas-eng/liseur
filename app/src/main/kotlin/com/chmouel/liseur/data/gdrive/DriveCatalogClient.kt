@@ -27,6 +27,11 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
         credentials: RemoteCredentials,
         onPage: suspend (List<RemoteBook>) -> Unit,
     ): CatalogWalk = withContext(Dispatchers.IO) {
+        // Liburuville: a Google sign-in that can no longer be renewed is not «no connection»:
+        // say so, so the notice offers to reconnect instead of trying again forever.
+        if (DriveAuth.refreshToken() != null && DriveAuth.accessTokenBlocking() == null && DriveAuth.lastTokenRefusal in 400..499) {
+            throw com.chmouel.liseur.data.remote.RemoteHttpFailure(com.chmouel.liseur.data.remote.SyncFailure.Unauthorised)
+        }
         val root = libraryFolder() ?: return@withContext CatalogWalk(complete = false)
         val queue = ArrayDeque(listOf(root))
         val seen = mutableSetOf<String>()
@@ -99,7 +104,17 @@ class DriveCatalogClient(private val http: OkHttpClient = DriveAuth.client()) : 
             .build()
         http.newCall(Request.Builder().url(url).build()).execute().use { response ->
             val text = response.body.string()
-            if (!response.isSuccessful) throw IOException("Drive ${response.code}")
+            if (!response.isSuccessful) {
+                Log.w(TAG, "Drive ${response.code}: ${text.take(300)}")
+                throw com.chmouel.liseur.data.remote.RemoteHttpFailure(
+                    when (response.code) {
+                        401 -> com.chmouel.liseur.data.remote.SyncFailure.Unauthorised
+                        403 -> if ("rateLimit" in text || "userRateLimit" in text) com.chmouel.liseur.data.remote.SyncFailure.ServerError(429) else com.chmouel.liseur.data.remote.SyncFailure.Forbidden
+                        404 -> com.chmouel.liseur.data.remote.SyncFailure.NotFound
+                        else -> com.chmouel.liseur.data.remote.SyncFailure.ServerError(response.code)
+                    },
+                )
+            }
             return JSONObject(text)
         }
     }

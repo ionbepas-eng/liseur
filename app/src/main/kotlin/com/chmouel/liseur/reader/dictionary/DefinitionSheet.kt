@@ -38,6 +38,19 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -266,14 +279,17 @@ fun DefinitionSheet(
 
     // Liburuville: a floating, translucent card over the page — a context menu for the word,
     // not a sheet that hides half the book.
-    val floatingPaper = MaterialTheme.colorScheme.surface
+    // Liburuville: the web's card — warm paper (or its dark twin), never the page's own colour.
+    val darkCard = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
+    val floatingPaper = if (darkCard) Color(0xFF201F1D) else Color(0xFFFAF8F3)
     LiseurModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = floatingPaper,
         scrimColor = Color.Black.copy(alpha = 0.08f),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
         sheetMaxWidth = 460.dp,
+        contentColor = if (darkCard) Color(0xFFF2EFE9) else Color(0xFF1B1A17),
         modifier = Modifier
             .padding(horizontal = 14.dp)
             .padding(bottom = 14.dp)
@@ -314,48 +330,66 @@ fun DefinitionSheet(
                     ?.takeIf { it.headword == term }
                     ?.pronunciation
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    // Liburuville: the web's head — the word centred, the bookmark and ✕ to the right.
+                    val vocabVersion by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
+                    val saved = remember(vocabVersion, entry, source) {
+                        com.chmouel.liseur.data.gdrive.LiburuShared.isSaved(context, source, entry)
+                    }
+                    val chip = if (darkCard) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.width(80.dp))
                         Text(
                             text = term,
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        // Liburuville: keep the word in the vocabulary shared with the web.
-                        val vocabVersion by com.chmouel.liseur.data.gdrive.LiburuShared.version.collectAsState()
-                        val saved = remember(vocabVersion, entry, source) {
-                            com.chmouel.liseur.data.gdrive.LiburuShared.isSaved(context, source, entry)
-                        }
-                        AssistChip(
+                        androidx.compose.material3.Surface(
                             onClick = {
-                                val def = found?.senses?.firstOrNull()?.definitions?.firstOrNull()
-                                com.chmouel.liseur.data.gdrive.LiburuShared.saveWord(
-                                    context, entry, source, def?.replace(Regex("<[^>]+>"), "")?.take(400),
-                                    com.chmouel.liseur.data.gdrive.LiburuShared.currentBookTitle,
-                                    tr = LiburuEnEs.lookupLoaded(context, entry)?.es?.take(3)?.joinToString(", ") { it.first },
-                                )
+                                if (saved) com.chmouel.liseur.data.gdrive.LiburuShared.deleteWord(context, "$source:${entry.lowercase()}")
+                                else {
+                                    val def = found?.senses?.firstOrNull()?.definitions?.firstOrNull()
+                                    com.chmouel.liseur.data.gdrive.LiburuShared.saveWord(
+                                        context, entry, source, def?.replace(Regex("<[^>]+>"), "")?.take(400),
+                                        com.chmouel.liseur.data.gdrive.LiburuShared.currentBookTitle,
+                                        tr = LiburuEnEs.lookupLoaded(context, entry)?.es?.take(3)?.joinToString(", ") { it.first },
+                                    )
+                                }
                             },
-                            enabled = !saved,
-                            label = { Text(if (saved) "Guardada" else "Guardar") },
-                        )
-                        if (onSelectText != null) {
-                            AssistChip(
-                                onClick = onSelectText,
-                                label = { Text(stringResource(R.string.dictionary_select_text)) },
-                            )
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = if (saved) MaterialTheme.colorScheme.primary else chip,
+                            contentColor = if (saved) MaterialTheme.colorScheme.onPrimary else androidx.compose.material3.LocalContentColor.current,
+                            modifier = Modifier.size(38.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    if (saved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = if (saved) "Guardada en tu vocabulario" else "Guardar en vocabulario",
+                                    modifier = Modifier.size(19.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        androidx.compose.material3.Surface(onClick = onDismiss, shape = androidx.compose.foundation.shape.CircleShape, color = chip, modifier = Modifier.size(38.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.close), modifier = Modifier.size(19.dp)) }
                         }
                     }
-                    if (firstPronunciation != null) {
-                        Text(
-                            text = firstPronunciation,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    androidx.compose.material3.HorizontalDivider(Modifier.padding(top = 8.dp), color = chip.copy(alpha = chip.alpha * 2))
+                    // The word, its sound and a speaker, as the web's first line.
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Text(entry, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        firstPronunciation?.let {
+                            Text("  |  $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        val speaker = remember { LiburuSpeaker(context) }
+                        androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speaker.close() } }
+                        Text("🔊", modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { speaker.say(entry, source) }.padding(4.dp))
                     }
+
                 }
                 // Liburuville: the Spanish for an English word, from the bundled dictionary (no connection needed).
                 val englishBook = source.startsWith("en") || (bookLanguage?.startsWith("en") == true)
@@ -364,9 +398,16 @@ fun DefinitionSheet(
                 }
                 enEs?.let { hit ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("En español" + if (hit.lemma != term.lowercase()) " · ${hit.lemma}" else "", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        Text(hit.es.joinToString("  ·  ") { (w, pos) -> if (pos.isNotEmpty()) "$w ($pos)" else w }, style = MaterialTheme.typography.titleMedium)
-                        Text("Wiktionary, sin conexión", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        hit.es.groupBy { it.second }.forEach { (pos, words) ->
+                            Text(
+                                androidx.compose.ui.text.buildAnnotatedString {
+                                    if (pos.isNotEmpty()) { withStyle(androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$pos ") } }
+                                    append(words.joinToString("; ") { it.first })
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                        Text("Diccionario sin conexión (Wiktionary) · Inglés-Español" + if (hit.lemma != term.lowercase()) " · ${hit.lemma}" else "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -487,16 +528,22 @@ fun DefinitionSheet(
                             )
                         }
                     }
-                    DictionaryLink(
-                        label = stringResource(R.string.dictionary_other_app),
-                        onClick = { onOpenInDictionaryApp(term) },
-                    )
-                    if (enabled || offline == null) {
-                        DictionaryLink(
-                            label = stringResource(R.string.dictionary_open_full_entry),
-                            onClick = { onOpenInBrowser(entry, baseUrl) },
-                        )
+                }
+                // Liburuville: the web's menu under the entry.
+                val sep = if (darkCard) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.1f)
+                Column {
+                    val en = source.startsWith("en")
+                    val q = java.net.URLEncoder.encode(entry, "UTF-8")
+                    DictMenuRow(Icons.Outlined.Search, if (en) "Buscar en WordReference" else "Buscar en la RAE", sep) {
+                        com.chmouel.liseur.ui.library.openUrl(context, if (en) "https://www.wordreference.com/es/translation.asp?tranword=$q" else "https://dle.rae.es/$q")
                     }
+                    if (target != null) DictMenuRow(Icons.Outlined.Translate, "Traducir", sep) {
+                        if (showTranslations && translations != TranslationsState.Loading) translationAttempt++
+                        showTranslations = true
+                    }
+                    if (onSelectText != null) DictMenuRow(Icons.Outlined.Edit, stringResource(R.string.dictionary_select_text), sep, onSelectText)
+                    DictMenuRow(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.dictionary_other_app), sep) { onOpenInDictionaryApp(term) }
+                    if (enabled || offline == null) DictMenuRow(Icons.Outlined.Public, stringResource(R.string.dictionary_open_full_entry), sep) { onOpenInBrowser(entry, baseUrl) }
                 }
             }
 
@@ -1209,4 +1256,31 @@ internal fun liburuSiteFor(baseUrl: String, bookLanguage: String?, languages: Li
     val lang = (bookLanguage?.takeIf { it.isNotBlank() } ?: languages.firstOrNull())
         ?.let { Locale.forLanguageTag(it).language }?.lowercase() ?: return baseUrl
     return if (lang in LIBURU_EDITIONS) "https://$lang.wiktionary.org" else baseUrl
+}
+
+
+@Composable
+private fun DictMenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, sep: Color, onClick: () -> Unit) {
+    androidx.compose.material3.HorizontalDivider(color = sep)
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+    }
+}
+
+/** Liburuville: the word said aloud by the phone's own voice, as the web's 🔊. */
+private class LiburuSpeaker(context: android.content.Context) {
+    private var ready = false
+    private val tts = android.speech.tts.TextToSpeech(context.applicationContext) { ready = it == android.speech.tts.TextToSpeech.SUCCESS }
+    fun say(text: String, lang: String) {
+        if (!ready) return
+        tts.language = java.util.Locale.forLanguageTag(lang.ifBlank { "es" })
+        tts.setSpeechRate(0.92f)
+        tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "liburu-word")
+    }
+    fun close() = runCatching { tts.shutdown() }
 }

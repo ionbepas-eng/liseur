@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -93,6 +94,10 @@ fun LiseurModalBottomSheet(
     sheetMaxWidth: androidx.compose.ui.unit.Dp = BottomSheetDefaults.SheetMaxWidth,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // Liburuville: over a wallpaper the theme's surface is clear, and a clear sheet lets the
+    // screen behind show through its text. A sheet always lies on the opaque paper.
+    val paper = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 1f)
+    val containerColor = if (containerColor.alpha < 0.99f) containerColor.compositeOver(paper) else containerColor
     val eInk = LocalEInk.current
     if (!eInk) {
         ModalBottomSheet(
